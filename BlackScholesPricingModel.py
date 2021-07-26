@@ -1,4 +1,4 @@
-#Black Scholes Pricing Model asc,dsldksld;
+#Black Scholes Pricing Model
 
 from math import sqrt, exp, log, erfc
 
