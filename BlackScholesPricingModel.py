@@ -4,33 +4,72 @@
 import math
 from scipy.stats import norm
 
-class EuropeanCall:
-    def call_price(
-        self, asset_price, strike_price, time_to_maturity, risk_free_rate,
-        volatility):
+# Define the variables
+# S = underlying asset price
+# K = strike price
+# T = time to maturity
+# r = risk-free rate
+# sigma = volatility
 
-        b = math.exp(risk_free_rate * time_to_maturity)
-        x1 = math.log(asset_price / (b*strike_price)) + .5 *(volatility * volatility * volatility) * time_to_maturity
-        x1 = x1 / (volatility * (time_to_maturity ** .5))
+class EuropeanCall:
+
+    def call_price(
+        self, S, sigma, K,
+        T, r
+            ):
+        b = math.exp(-r*T)
+        x1 = math.log(S/(b*K)) + .5*(sigma*sigma)*T
+        x1 = x1/(sigma*(T**.5))
         z1 = norm.cdf(x1)
-        z1 = z1 * asset_price
-        x2 = math.log(asset_price / (b*strike_price)) - .5 *(volatility * volatility * volatility) * time_to_maturity
-        x2 = x2 / (volatility * (time_to_maturity ** .5))
+        z1 = z1*S
+        x2 = math.log(S/(b*K)) - .5*(sigma*sigma)*T
+        x2 = x2/(sigma*(T**.5))
         z2 = norm.cdf(x2)
-        z2 = b * strike_price * z2
+        z2 = b*K*z2
         return z1 - z2
 
-        def __init__(self, asset_price, strike_price, time_to_maturity, risk_free_rate, volatility):
-            self.asset_price = asset_price
-            self.strike_price = strike_price
-            self.time_to_maturity = time_to_maturity
-            self.risk_free_rate = risk_free_rate
-            self.volatility = volatility
-            self.price = self.call_price(asset_price, strike_price, time_to_maturity, risk_free_rate, volatility)
+    def __init__(
+        self, S, sigma, K,
+        T, r
+            ):
+        self.S = S
+        self.sigma = sigma
+        self.K = K
+        self.T = T
+        self.r = r
+        self.price = self.call_price(S, sigma, K, T, r)
+        
 
 class EuropeanPut:
-    def put_price(
-        self, asset_price, strike_price, time_to_maturity, risk_free_rate,
-        volatility):
 
-        
+    def put_price(
+        self, S, sigma, K,
+        T, r
+            ):
+        b = math.exp(-r*T)
+        x1 = math.log((b*K)/S) + .5*(sigma*sigma)*T
+        x1 = x1/(sigma*(T**.5))
+        z1 = norm.cdf(x1)
+        z1 = b*K*z1
+        x2 = math.log((b*K)/S) - .5*(sigma*sigma)*T
+        x2 = x2/(sigma*(T**.5))
+        z2 = norm.cdf(x2)
+        z2 = S*z2
+        return z1 - z2
+
+    def __init__(
+        self, S, sigma, K,
+        T, r
+            ):
+        self.S = S
+        self.sigma = sigma
+        self.K = K
+        self.T = T
+        self.r = r
+        self.price = self.put_price(S, sigma, K, T, r)
+
+ec = EuropeanCall(100, .3, 90, 30, .01)
+print ("The price of the call option is: ", ec.price)
+
+ep = EuropeanPut(100, .3, 90, 30, .01)
+print ("The price of the put option is: ", ep.price)
