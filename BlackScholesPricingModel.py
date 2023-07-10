@@ -1,6 +1,3 @@
-# Create a calculator using the black scholes model to determine the fair price for a call or put option 
-# based on six variables such as volatality, type of option, underlying stock price, time, strike, and risk-free rate.
-
 from math import log, sqrt, exp
 from scipy.stats import norm
 from datetime import datetime
