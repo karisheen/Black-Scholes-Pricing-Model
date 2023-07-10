@@ -41,9 +41,9 @@ if data_choice == 'r':
     data = yf.download(stock, period="1y")  # Download 1 year of data using yfinance
     current_price = round(data["Adj Close"].iloc[-1], 2)
     print("The current price of", stock, " is: ", current_price)
-    choice = input("Wanna price a call or a put ? (c/p): ")
-    expiry = str(input("select the expiry date (format mm-dd-YYYY): "))
-    strike_price = int(input("select the strike price: "))
+    choice = input("Want to price a call or a put ? (c/p): ")
+    expiry = str(input("Select the expiry date (format mm-dd-YYYY): "))
+    strike_price = int(input("Select the strike price: "))
     data["returns"] = data["Close"].pct_change()
     sigma = np.sqrt(252) * data["returns"].std()
 
@@ -52,8 +52,24 @@ if data_choice == 'r':
     t = (datetime.strptime(expiry, "%m-%d-%Y") - datetime.now()).days / 365
 
     if choice == "c":
-        print("The Call Price is: ", bs_call(current_price, strike_price, t, ty10y, sigma))
+        print("The Call Option Price is: ", bs_call(current_price, strike_price, t, ty10y, sigma))
     if choice == "p":
-        print("The Put Price is: ", bs_put(current_price, strike_price, t, ty10y, sigma))
+        print("The Put Option Price is: ", bs_put(current_price, strike_price, t, ty10y, sigma))
+
+elif data_choice == 'm':
+    # Ask the user to input their own values for the variables
+    S = float(input("Enter the underlying price of the stock: "))  # Current price of the underlying asset
+    K = float(input("Enter the strike price of the option: "))  # Strike price of the option
+    T = float(input("Enter the time to expiry in days: ")) / 365  # Time to expiry in years
+    r = float(input("Enter the risk-free rate as a percentage: ")) / 100  # Risk-free interest rate as a percentage
+    sigma = float(input("Enter the volatility of the underlying asset as a percentage: ")) / 100  # Volatility as a percentage
+
+    # Ask user whether they want to calculate a call or a put option
+    choice = input("Want to price a call or a put ? (c/p): ")
+    
+    if choice == "c":
+        print("The Call Price is: ", bs_call(S, K, T, r, sigma))
+    if choice == "p":
+        print("The Put Price is: ", bs_put(S, K, T, r, sigma))
 
 
