@@ -7,6 +7,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 import pandas_datareader.data as web
+import yfinance as yf
 
 # Define the variables
 # S = underlying asset price
@@ -34,27 +35,25 @@ def bs_put(S, K, T, r, sigma):
 # Ask the user if the want to use real stock data or manually input the variables
 data_choice = input ("Do you want to use real stock data or manually input the variables? (r/m): ")
 
-if data_choice == "r":
-    # Fetch real stock data and calculate option prices
-    stock = str(input("Enter the stock ticker: "))
-    current_price = round(web.DataReader(stock, "yahoo")["Adj Close"].iloc[-1], 2)
+if data_choice == 'r':
+    # Fetch real stock data and calculate options prices
+    stock = str(input("select the stock you want: "))
+    data = yf.download(stock, period="1y")  # Download 1 year of data using yfinance
+    current_price = round(data["Adj Close"].iloc[-1], 2)
     print("The current price of", stock, " is: ", current_price)
     choice = input("Wanna price a call or a put ? (c/p): ")
     expiry = str(input("select the expiry date (format mm-dd-YYYY): "))
     strike_price = int(input("select the strike price: "))
-    today = datetime.now()
-    one_year_ago = today.replace(year=today.year - 1)
-    df = web.DataReader(stock, "yahoo", one_year_ago, today)
-    df = df.sort_values(by="Date")
-    df = df.dropna()
-    df = df.assign(close_day_before=df.Close.shift(1))
-    df["returns"] = (df.Close - df.close_day_before) / df.close_day_before
-    sigma = np.sqrt(252) * df["returns"].std()
-    ty10y = (web.DataReader("^TNX", "yahoo")["Close"].iloc[-1]) / 100
-    last_close = df["Close"].iloc[-1]
-    t = (datetime.strptime(expiry, "%m-%d-%Y") - datetime.utcnow()).days / 365
+    data["returns"] = data["Close"].pct_change()
+    sigma = np.sqrt(252) * data["returns"].std()
+
+    # Assume a risk-free rate of 2% or any other rate // did this beacuse yfinance was struggling to calcluate the risk free rate from the treasury data. Will fix later
+    ty10y = 0.02
+    t = (datetime.strptime(expiry, "%m-%d-%Y") - datetime.now()).days / 365
 
     if choice == "c":
-        print("The Call Price is: ", bs_call(last_close, strike_price, t, ty10y, sigma))
+        print("The Call Price is: ", bs_call(current_price, strike_price, t, ty10y, sigma))
     if choice == "p":
-        print("The Put Price is: ", bs_put(last_close, strike_price, t, ty10y, sigma))
+        print("The Put Price is: ", bs_put(current_price, strike_price, t, ty10y, sigma))
+
+
