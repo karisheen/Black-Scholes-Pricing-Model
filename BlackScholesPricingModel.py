@@ -15,65 +15,18 @@ import pandas_datareader.data as web
 # r = risk-free rate
 # sigma = volatility
 
-class EuropeanCall:
+# Define the d1 and d2 functions
 
-    def call_price(
-        self, S, sigma, K,
-        T, r
-            ):
-        b = math.exp(-r*T)
-        x1 = math.log(S/(b*K)) + .5*(sigma*sigma)*T
-        x1 = x1/(sigma*(T**.5))
-        z1 = norm.cdf(x1)
-        z1 = z1*S
-        x2 = math.log(S/(b*K)) - .5*(sigma*sigma)*T
-        x2 = x2/(sigma*(T**.5))
-        z2 = norm.cdf(x2)
-        z2 = b*K*z2
-        return z1 - z2
+def d1(S, K, T, r, sigma):
+    return (log(S / K) + (r + sigma ** 2 / 2) * T) / (sigma * sqrt(T))
 
-    def __init__(
-        self, S, sigma, K,
-        T, r
-            ):
-        self.S = S
-        self.sigma = sigma
-        self.K = K
-        self.T = T
-        self.r = r
-        self.price = self.call_price(S, sigma, K, T, r)
-        
+def d2(S, K, T, r, sigma):
+    return d1(S, K, T, r, sigma) - sigma * sqrt(T)
 
-class EuropeanPut:
+# Define the Black Scholes Call Option formula
+def bs_call(S, K, T, r, sigma):
+    return S * norm.cdf(d1(S, K, T, r, sigma)) - K * exp(-r * T) * norm.cdf(d2(S, K, T, r, sigma))
 
-    def put_price(
-        self, S, sigma, K,
-        T, r
-            ):
-        b = math.exp(-r*T)
-        x1 = math.log((b*K)/S) + .5*(sigma*sigma)*T
-        x1 = x1/(sigma*(T**.5))
-        z1 = norm.cdf(x1)
-        z1 = b*K*z1
-        x2 = math.log((b*K)/S) - .5*(sigma*sigma)*T
-        x2 = x2/(sigma*(T**.5))
-        z2 = norm.cdf(x2)
-        z2 = S*z2
-        return z1 - z2
-
-    def __init__(
-        self, S, sigma, K,
-        T, r
-            ):
-        self.S = S
-        self.sigma = sigma
-        self.K = K
-        self.T = T
-        self.r = r
-        self.price = self.put_price(S, sigma, K, T, r)
-
-ec = EuropeanCall(100, .3, 90, 30, .01)
-print ("The price of the call option is: ", ec.price)
-
-ep = EuropeanPut(100, .3, 90, 30, .01)
-print ("The price of the put option is: ", ep.price)
+# Define the Black Scholes Put Option formula
+def bs_put(S, K, T, r, sigma):
+    return K * exp(-r * T) - S + bs_call(S, K, T, r, sigma)
