@@ -6,12 +6,7 @@ The script allows for two forms of data input: manual user input of financial va
 
 ## Features
 Black-Scholes-Merton Model Functions: The script includes functions for calculating the intermediary 
-�
-1
-d1 and 
-�
-2
-d2 values, as well as the final pricing for both Call and Put options.
+d1 and d2 values, as well as the final pricing for both Call and Put options.
 
 Real-Time Stock Data: The script can fetch and utilize real-time stock data, including current price and historical data, to calculate the necessary variables for the Black-Scholes-Merton model.
 
