@@ -12,7 +12,7 @@ import yfinance as yf
 # T = time to maturity
 # r = risk-free rate
 # sigma = volatility
-# this is a test comment to determine if I am on the right github account
+
 
 # Define the d1 and d2 functions
 
