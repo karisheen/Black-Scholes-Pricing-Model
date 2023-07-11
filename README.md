@@ -1,4 +1,4 @@
-Black-Scholes-Merton Pricing Model in Python
+# Black-Scholes-Merton Pricing Model in Python
 Introduction
 This project is a Python implementation of the Black-Scholes-Merton model, a seminal concept in financial markets used for the theoretical pricing of options.
 
