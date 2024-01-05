@@ -119,3 +119,5 @@ def calculate_option_price(n_clicks, choice, symbol, strike, expiry, opt_type,
 # Run the app
 if __name__ == '__main__':
     app.run_server(debug=True)
+
+# bullshit 
