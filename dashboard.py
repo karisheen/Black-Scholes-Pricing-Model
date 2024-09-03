@@ -9,8 +9,8 @@ import numpy as np
 # Import the Black Scholes functions from your model file
 from BlackScholesPricingModel import bs_call, bs_put
 
-# Initialize the Dash app
-app = dash.Dash(__name__)
+# Initialize the Dash app with suppress_callback_exceptions=True
+app = dash.Dash(__name__, suppress_callback_exceptions=True)
 
 # Define the app layout
 app.layout = html.Div([
@@ -82,40 +82,45 @@ def update_input_area(choice):
     State('option-type-manual', 'value')
 )
 def calculate_option_price(n_clicks, choice, symbol, strike, expiry, opt_type,
-                           S, K_manual, T_days, r, vol, opt_type_manual):
+                           S, K, T, r, sigma, opt_type_manual):
     if n_clicks is None:
-        return ''
+        return ""
     
-    try:
-        if choice == 'real':
-            data = yf.download(symbol, period="1y")
-            S = data["Adj Close"].iloc[-1]
-            T = (datetime.strptime(expiry, "%m-%d-%Y") - datetime.now()).days / 365
-            sigma = np.sqrt(252) * data["returns"].std()
-            r = 0.02  # Fixed risk-free rate
-
+    if choice == 'real':
+        # Use real stock data and Black-Scholes formula
+        if not symbol or not strike or not expiry or not opt_type:
+            return "Please provide all required inputs."
+        
+        stock_data = yf.Ticker(symbol)
+        try:
+            current_price = stock_data.history(period="1d")['Close'].iloc[0]
+            T = (datetime.strptime(expiry, "%m-%d-%Y") - datetime.now()).days / 365.0
+            r = 0.01  # Risk-free rate (use a constant or fetch from an API)
+            sigma = stock_data.history(period="1y")['Close'].pct_change().std() * np.sqrt(252)
+            
             if opt_type == 'call':
-                price = bs_call(S, strike, T, r, sigma)
+                option_price = bs_call(current_price, strike, T, r, sigma)
             else:
-                price = bs_put(S, strike, T, r, sigma)
-
-            return f'The calculated {opt_type} option price for {symbol} is: {price:.2f}'
-
+                option_price = bs_put(current_price, strike, T, r, sigma)
+                
+            return f"The {opt_type} option price is ${option_price:.2f}"
+        
+        except Exception as e:
+            return f"Error calculating option price: {e}"
+    
+    else:
+        # Manually inputted data
+        if not S or not K or not T or not r or not sigma or not opt_type_manual:
+            return "Please provide all required inputs."
+        
+        T = T / 365.0  # Convert days to years
+        if opt_type_manual == 'call':
+            option_price = bs_call(S, K, T, r, sigma)
         else:
-            T = T_days / 365  # Convert days to years
-            r /= 100  # Convert percentage to decimal
-            vol /= 100  # Convert percentage to decimal
+            option_price = bs_put(S, K, T, r, sigma)
+            
+        return f"The {opt_type_manual} option price is ${option_price:.2f}"
 
-            if opt_type_manual == 'call':
-                price = bs_call(S, K_manual, T, r, vol)
-            else:
-                price = bs_put(S, K_manual, T, r, vol)
-
-            return f'The calculated {opt_type_manual} option price is: {price:.2f}'
-
-    except Exception as e:
-        return f'Error: {e}'
-
-# Run the app
 if __name__ == '__main__':
     app.run_server(debug=True)
+
