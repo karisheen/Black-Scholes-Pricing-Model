@@ -2,7 +2,7 @@
 import dash
 from dash import html, dcc, Input, Output, State
 import plotly.graph_objs as go
-from datetime import datetime
+from datetime import datetime, date
 import yfinance as yf
 import numpy as np
 
@@ -14,7 +14,7 @@ app = dash.Dash(__name__)
 
 # Define the app layout
 app.layout = html.Div([
-    html.H1("Black-Scholes Option Pricing Calculator"),
+    html.H1("Black-Scholes Option Pricing Dashboard"),
     
     # Radio buttons to choose data input method
     dcc.RadioItems(
@@ -36,7 +36,12 @@ app.layout = html.Div([
             html.Br(),
             dcc.Input(id='strike-price', type='number', placeholder='Strike Price'),
             html.Br(),
-            dcc.Input(id='expiry-date', type='text', placeholder='Expiry Date (mm-dd-yyyy)'),
+            # Replace the text input with DatePickerSingle component
+            dcc.DatePickerSingle(
+                id='expiry-date',
+                min_date_allowed=date.today(),
+                placeholder='Expiry Date'
+            ),
             html.Br(),
             dcc.RadioItems(
                 id='option-type',
@@ -103,7 +108,7 @@ def toggle_input_forms(choice):
     # Real data inputs
     State('stock-symbol', 'value'),
     State('strike-price', 'value'),
-    State('expiry-date', 'value'),
+    State('expiry-date', 'date'),  # Note the change here
     State('option-type', 'value'),
     # Manual inputs
     State('underlying-price', 'value'),
@@ -134,8 +139,8 @@ def calculate_option_price(n_clicks, choice, stock_symbol, strike_price_real, ex
             current_price = hist['Close'].iloc[-1]
             
             # Calculate time to expiry
-            expiry_datetime = datetime.strptime(expiry_date, "%m-%d-%Y")
-            days_to_expiry = (expiry_datetime - datetime.now()).days
+            expiry_datetime = datetime.strptime(expiry_date, "%Y-%m-%d").date()
+            days_to_expiry = (expiry_datetime - date.today()).days
             if days_to_expiry <= 0:
                 return "The expiry date must be in the future."
             T = days_to_expiry / 365.0
@@ -217,5 +222,3 @@ def calculate_option_price(n_clicks, choice, stock_symbol, strike_price_real, ex
 
 if __name__ == '__main__':
     app.run_server(debug=True)
-
-
