@@ -14,7 +14,7 @@ app = dash.Dash(__name__)
 
 # Define the app layout
 app.layout = html.Div([
-    html.H1("Black-Scholes Option Pricing Dashboard"),
+    html.H1("Black-Scholes Option Pricing Calculator"),
     
     # Radio buttons to choose data input method
     dcc.RadioItems(
