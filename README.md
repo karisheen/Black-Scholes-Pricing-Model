@@ -219,8 +219,8 @@ The test suite validates:
 ## Performance
 
 The reference microbenchmark prices 10,000 heterogeneous calls. On the
-development machine, the scalar loop averaged 1.700 seconds and the vectorized
-path averaged 1.535 milliseconds—about a 1,107× speedup. This measures the
+development machine, the scalar loop averaged 2.072 seconds and the vectorized
+path averaged 1.644 milliseconds—about a 1,261× speedup. This measures the
 intended amortization of Python conversion, validation, and call overhead; it is
 not treated as a cross-machine performance guarantee.
 

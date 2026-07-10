@@ -23,11 +23,11 @@ uv run pytest benchmarks/test_pricing_benchmarks.py --benchmark-only
 
 On the development machine with CPython 3.13.5 and NumPy 2.5.1:
 
-- Scalar loop mean: **1.700 seconds per 10,000 options**, approximately 5,882
+- Scalar loop mean: **2.072 seconds per 10,000 options**, approximately 4,825
   options/second.
-- Vectorized mean: **1.535 milliseconds per 10,000 options**, approximately
-  6.51 million options/second.
-- Observed mean speedup: **about 1,107×**.
+- Vectorized mean: **1.644 milliseconds per 10,000 options**, approximately
+  6.08 million options/second.
+- Observed mean speedup: **about 1,261×**.
 
 The large difference is expected: the scalar loop repeatedly pays Python call,
 conversion, broadcasting, and validation overhead. The vectorized path
