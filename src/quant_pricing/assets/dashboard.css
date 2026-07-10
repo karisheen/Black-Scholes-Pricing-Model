@@ -1,0 +1,60 @@
+.dashboard-shell {
+  --dashboard-ink: #172033;
+  --dashboard-muted: #596579;
+  --dashboard-panel: #ffffff;
+  --dashboard-canvas: #f3f6fa;
+  --dashboard-border: #dce3ec;
+  --dashboard-input: #ffffff;
+  --dashboard-accent: #00695c;
+  --dashboard-danger: #c62828;
+  --dashboard-button-text: #ffffff;
+
+  min-height: 100vh;
+  color: var(--dashboard-ink);
+  background: var(--dashboard-canvas);
+  transition:
+    color 160ms ease,
+    background-color 160ms ease;
+}
+
+.dashboard-shell.theme-dark {
+  color-scheme: dark;
+  --dashboard-ink: #e6edf7;
+  --dashboard-muted: #a7b3c5;
+  --dashboard-panel: #151c2b;
+  --dashboard-canvas: #0b1020;
+  --dashboard-border: #2c3850;
+  --dashboard-input: #101725;
+  --dashboard-accent: #3db8a8;
+  --dashboard-danger: #ff6b6b;
+  --dashboard-button-text: #07120f;
+}
+
+.dashboard-shell input {
+  color: var(--dashboard-ink);
+  background: var(--dashboard-input);
+}
+
+.dashboard-shell button:focus-visible,
+.dashboard-shell input:focus-visible,
+.dashboard-shell label:focus-within {
+  outline: 3px solid color-mix(in srgb, var(--dashboard-accent) 65%, transparent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 760px) {
+  .dashboard-content-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .dashboard-header {
+    align-items: flex-start !important;
+    flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-shell {
+    transition: none;
+  }
+}
