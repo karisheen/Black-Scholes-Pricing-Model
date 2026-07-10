@@ -410,6 +410,22 @@ def test_non_numeric_and_overflowing_discount_inputs_raise_clear_errors() -> Non
         price("call", SPOT, STRIKE, 1.0, -1e3, VOLATILITY)
     with pytest.raises(InputValidationError, match="dividend_yield produces"):
         price("call", SPOT, STRIKE, 1.0, RATE, VOLATILITY, -1e3)
+    with pytest.raises(InputValidationError, match="discounted strike exceeds"):
+        price("put", SPOT, STRIKE, 1.0, -709.0, VOLATILITY)
+    with pytest.raises(InputValidationError, match="discounted spot exceeds"):
+        price("call", SPOT, STRIKE, 1.0, RATE, VOLATILITY, -709.0)
+
+
+def test_complex_inputs_are_rejected_without_lossy_conversion() -> None:
+    with pytest.raises(InputValidationError, match="spot must contain real numbers"):
+        price(
+            "call",
+            np.array([100.0 + 1.0j]),
+            STRIKE,
+            TIME,
+            RATE,
+            VOLATILITY,
+        )
 
 
 @pytest.mark.parametrize(
@@ -453,3 +469,19 @@ def test_extreme_total_variance_uses_finite_limiting_values_without_warnings() -
         math.isfinite(metric)
         for metric in (risk.delta, risk.gamma, risk.vega, risk.theta, risk.rho)
     )
+
+
+def test_underflowed_total_volatility_uses_deterministic_limit() -> None:
+    with np.errstate(all="raise"):
+        first, second = d1_d2(100.0, 100.0, 1e-300, 0.0, 1e-200)
+        call = price("call", 100.0, 100.0, 1e-300, 0.0, 1e-200)
+        put = price("put", 100.0, 100.0, 1e-300, 0.0, 1e-200)
+        risk = greeks("call", 100.0, 100.0, 1e-300, 0.0, 1e-200)
+
+    assert first == 0.0
+    assert second == 0.0
+    assert call == 0.0
+    assert put == 0.0
+    assert risk.delta == 0.5
+    assert risk.gamma == 0.0
+    assert risk.vega == 0.0

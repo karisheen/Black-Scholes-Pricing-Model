@@ -20,6 +20,7 @@ from quant_pricing.exceptions import InputValidationError
 FloatArray: TypeAlias = NDArray[np.float64]
 NumericResult: TypeAlias = float | FloatArray
 _SQRT_TWO_PI = np.sqrt(2.0 * np.pi)
+_LOG_FLOAT_MAX = np.log(np.finfo(np.float64).max)
 
 
 class OptionType(str, Enum):
@@ -78,6 +79,8 @@ class _Inputs:
 
 
 def _as_float_array(value: ArrayLike, name: str) -> FloatArray:
+    if np.iscomplexobj(value):
+        raise InputValidationError(f"{name} must contain real numbers")
     try:
         array = np.asarray(value, dtype=np.float64)
     except (TypeError, ValueError) as error:
@@ -163,12 +166,20 @@ def _positive_difference(log_first: FloatArray, log_second: FloatArray) -> Float
 def _log_discounted_assets(inputs: _Inputs) -> tuple[FloatArray, FloatArray]:
     log_spot = np.log(inputs.spot) - inputs.dividend_yield * inputs.time_to_expiry
     log_strike = np.log(inputs.strike) - inputs.rate * inputs.time_to_expiry
+    if np.any(log_spot > _LOG_FLOAT_MAX):
+        raise InputValidationError("discounted spot exceeds float range")
+    if np.any(log_strike > _LOG_FLOAT_MAX):
+        raise InputValidationError("discounted strike exceeds float range")
     return log_spot, log_strike
 
 
+def _total_volatility(inputs: _Inputs) -> FloatArray:
+    with np.errstate(over="ignore", under="ignore"):
+        return inputs.volatility * np.sqrt(inputs.time_to_expiry)
+
+
 def _standardized_terms(inputs: _Inputs) -> tuple[FloatArray, FloatArray]:
-    root_time = np.sqrt(inputs.time_to_expiry)
-    sigma_root_time = inputs.volatility * root_time
+    sigma_root_time = _total_volatility(inputs)
     log_forward_moneyness = (
         np.log(inputs.spot)
         - np.log(inputs.strike)
@@ -177,6 +188,15 @@ def _standardized_terms(inputs: _Inputs) -> tuple[FloatArray, FloatArray]:
     )
     with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
         scaled_moneyness = log_forward_moneyness / sigma_root_time
+    zero_scale_limit = np.where(
+        log_forward_moneyness > 0.0,
+        np.inf,
+        np.where(log_forward_moneyness < 0.0, -np.inf, 0.0),
+    )
+    scaled_moneyness = np.where(
+        sigma_root_time == 0.0, zero_scale_limit, scaled_moneyness
+    )
+    with np.errstate(invalid="ignore"):
         d1_value = scaled_moneyness + 0.5 * sigma_root_time
         d2_value = scaled_moneyness - 0.5 * sigma_root_time
     return d1_value, d2_value
@@ -262,7 +282,7 @@ def price(
         deterministic = _positive_difference(log_strike, log_spot)
         expiry_payoff = np.maximum(inputs.strike - inputs.spot, 0.0)
 
-    regular = (inputs.time_to_expiry > 0.0) & (inputs.volatility > 0.0)
+    regular = (inputs.time_to_expiry > 0.0) & (_total_volatility(inputs) > 0.0)
     if np.any(regular):
         first, second = _standardized_terms(inputs)
         if kind is OptionType.CALL:
@@ -291,11 +311,11 @@ def greeks(
 ) -> Greeks:
     """Calculate Delta, Gamma, Vega, calendar Theta, and Rho analytically.
 
-    At deterministic boundaries the function returns one-sided limiting values;
-    exactly at the payoff kink it uses the conventional midpoint Delta and
-    midpoint first-order sensitivities. Gamma and Vega are reported as zero at
-    expiry and at zero volatility because their distributional limits are not
-    finite point values.
+    At expiry this function uses an operational payoff convention: midpoint
+    Delta at the kink and zero Gamma, Vega, Theta, and Rho. At positive maturity
+    and zero effective volatility, first-order risk uses one-sided limits and
+    midpoint values at the deterministic exercise boundary. Gamma and Vega are
+    zero because their distributional limits are not finite point values.
     """
 
     kind = OptionType.parse(option_type)
@@ -308,8 +328,9 @@ def greeks(
     discount_yield = np.exp(-inputs.dividend_yield * inputs.time_to_expiry)
 
     expiry = inputs.time_to_expiry == 0.0
-    deterministic = (~expiry) & (inputs.volatility == 0.0)
-    regular = (~expiry) & (inputs.volatility > 0.0)
+    total_volatility = _total_volatility(inputs)
+    deterministic = (~expiry) & (total_volatility == 0.0)
+    regular = (~expiry) & (total_volatility > 0.0)
 
     spot_greater = inputs.spot > inputs.strike
     spot_equal = inputs.spot == inputs.strike
