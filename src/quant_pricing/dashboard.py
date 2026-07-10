@@ -79,7 +79,10 @@ def calculate_scenario(
         dividend_yield,
     )
 
-    spot_grid = np.linspace(0.5 * float(spot), 1.5 * float(spot), 161)
+    spot_grid = np.asarray(
+        np.linspace(0.5 * float(spot), 1.5 * float(spot), 161),
+        dtype=np.float64,
+    )
     call_by_spot = _array(
         price(
             OptionType.CALL,
@@ -102,7 +105,10 @@ def calculate_scenario(
             dividend_yield,
         )
     )
-    volatility_grid = np.linspace(0.0, max(2.0 * volatility, 0.5), 161)
+    volatility_grid = np.asarray(
+        np.linspace(0.0, max(2.0 * volatility, 0.5), 161),
+        dtype=np.float64,
+    )
     value_by_volatility = _array(
         price(
             kind,
