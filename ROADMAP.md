@@ -10,7 +10,7 @@ not by feature count.
    Engineering 5, Effort 3.
    - [x] Create a typed `src/` package with explicit public interfaces.
    - [x] Declare runtime and development dependencies in `pyproject.toml`.
-   - [ ] Add formatting, linting, static typing, tests, and CI.
+   - [x] Add formatting, linting, static typing, tests, and CI.
    - [x] Stop tracking generated and machine-local artifacts.
 
 2. **Numerically robust Black–Scholes–Merton pricing** — Portfolio 5, Quant 5,
@@ -59,9 +59,9 @@ not by feature count.
 
 9. **Portfolio-quality documentation** — Portfolio 5, Quant 4, Engineering 4,
    Effort 3.
-   - [ ] Explain formulas, assumptions, architecture, conventions, and limits.
-   - [ ] Document installation, API, dashboard, validation, and benchmarks.
-   - [ ] Distinguish implemented functionality from research extensions.
+   - [x] Explain formulas, assumptions, architecture, conventions, and limits.
+   - [x] Document installation, API, dashboard, validation, and benchmarks.
+   - [x] Distinguish implemented functionality from research extensions.
 
 ## P2 — Deferred research extensions
 
