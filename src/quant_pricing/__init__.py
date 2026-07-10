@@ -16,11 +16,16 @@ from quant_pricing.exceptions import (
     NoArbitrageError,
     PricingError,
 )
+from quant_pricing.implied_volatility import (
+    ImpliedVolatilityResult,
+    implied_volatility,
+)
 
 __version__ = "0.1.0"
 __all__ = [
     "Greeks",
     "ImpliedVolatilityError",
+    "ImpliedVolatilityResult",
     "InputValidationError",
     "NoArbitrageError",
     "OptionType",
@@ -28,6 +33,7 @@ __all__ = [
     "Valuation",
     "d1_d2",
     "greeks",
+    "implied_volatility",
     "price",
     "price_bounds",
     "value_and_greeks",

@@ -28,10 +28,10 @@ not by feature count.
 
 4. **Safeguarded implied volatility** — Portfolio 5, Quant 5, Engineering 5,
    Effort 4.
-   - [ ] Validate model-independent price bounds before iteration.
-   - [ ] Combine Newton steps with a guaranteed bisection bracket.
-   - [ ] Report convergence, iterations, residual, and failure causes.
-   - [ ] Test volatility recovery across moneyness and maturity regimes.
+   - [x] Validate model-independent price bounds before iteration.
+   - [x] Combine Newton steps with a guaranteed bisection bracket.
+   - [x] Report convergence, iterations, residual, and failure causes.
+   - [x] Test volatility recovery across moneyness and maturity regimes.
 
 5. **Numerical validation suite** — Portfolio 5, Quant 5, Engineering 5,
    Effort 4.
