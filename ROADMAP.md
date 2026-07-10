@@ -38,7 +38,7 @@ not by feature count.
    - [x] Add published reference-value regression tests.
    - [x] Test put–call parity, bounds, monotonicity, and Greek identities.
    - [x] Cover invalid, extreme, near-expiry, and degenerate inputs.
-   - [ ] Add application-level smoke and compatibility tests.
+   - [x] Add application-level smoke and compatibility tests.
 
 ## P1 — Performance and product quality
 
@@ -53,9 +53,9 @@ not by feature count.
 
 8. **Thin, deterministic user interfaces** — Portfolio 4, Quant 3,
    Engineering 4, Effort 3.
-   - [ ] Remove duplicated pricing formulas from the dashboard.
-   - [ ] Separate market-data estimation from deterministic pricing.
-   - [ ] Present prices, Greeks, assumptions, and sensitivity charts.
+   - [x] Remove duplicated pricing formulas from the dashboard.
+   - [x] Separate market-data estimation from deterministic pricing.
+   - [x] Present prices, Greeks, assumptions, and sensitivity charts.
 
 9. **Portfolio-quality documentation** — Portfolio 5, Quant 4, Engineering 4,
    Effort 3.

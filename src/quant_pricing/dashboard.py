@@ -1,0 +1,504 @@
+"""Dash user interface built on the deterministic pricing library."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any
+
+import numpy as np
+import plotly.graph_objects as go
+from dash import Dash, Input, Output, State, dcc, html
+from numpy.typing import NDArray
+
+from quant_pricing.black_scholes import (
+    OptionType,
+    Valuation,
+    price,
+    value_and_greeks,
+)
+from quant_pricing.exceptions import InputValidationError
+
+FloatArray = NDArray[np.float64]
+
+
+@dataclass(frozen=True, slots=True)
+class ScenarioAnalysis:
+    """A scalar valuation and vectorized sensitivity grids for the dashboard."""
+
+    option_type: OptionType
+    spot: float
+    strike: float
+    time_to_expiry: float
+    rate: float
+    volatility: float
+    dividend_yield: float
+    valuation: Valuation
+    spot_grid: FloatArray
+    call_by_spot: FloatArray
+    put_by_spot: FloatArray
+    volatility_grid: FloatArray
+    value_by_volatility: FloatArray
+
+
+def _array(value: float | FloatArray) -> FloatArray:
+    if not isinstance(value, np.ndarray):  # pragma: no cover - internal guard
+        raise TypeError("vectorized dashboard calculation produced a scalar")
+    return value
+
+
+def _scalar(value: float | FloatArray) -> float:
+    if not isinstance(value, float):  # pragma: no cover - internal guard
+        raise TypeError("scalar dashboard calculation produced an array")
+    return value
+
+
+def calculate_scenario(
+    option_type: OptionType | str,
+    spot: float,
+    strike: float,
+    time_to_expiry_days: float,
+    rate_percent: float,
+    volatility_percent: float,
+    dividend_yield_percent: float = 0.0,
+) -> ScenarioAnalysis:
+    """Calculate a dashboard valuation from human-readable units."""
+
+    kind = OptionType.parse(option_type)
+    time_to_expiry = float(time_to_expiry_days) / 365.0
+    rate = float(rate_percent) / 100.0
+    volatility = float(volatility_percent) / 100.0
+    dividend_yield = float(dividend_yield_percent) / 100.0
+    valuation = value_and_greeks(
+        kind,
+        spot,
+        strike,
+        time_to_expiry,
+        rate,
+        volatility,
+        dividend_yield,
+    )
+
+    spot_grid = np.linspace(0.5 * float(spot), 1.5 * float(spot), 161)
+    call_by_spot = _array(
+        price(
+            OptionType.CALL,
+            spot_grid,
+            strike,
+            time_to_expiry,
+            rate,
+            volatility,
+            dividend_yield,
+        )
+    )
+    put_by_spot = _array(
+        price(
+            OptionType.PUT,
+            spot_grid,
+            strike,
+            time_to_expiry,
+            rate,
+            volatility,
+            dividend_yield,
+        )
+    )
+    volatility_grid = np.linspace(0.0, max(2.0 * volatility, 0.5), 161)
+    value_by_volatility = _array(
+        price(
+            kind,
+            spot,
+            strike,
+            time_to_expiry,
+            rate,
+            volatility_grid,
+            dividend_yield,
+        )
+    )
+    return ScenarioAnalysis(
+        option_type=kind,
+        spot=float(spot),
+        strike=float(strike),
+        time_to_expiry=time_to_expiry,
+        rate=rate,
+        volatility=volatility,
+        dividend_yield=dividend_yield,
+        valuation=valuation,
+        spot_grid=spot_grid,
+        call_by_spot=call_by_spot,
+        put_by_spot=put_by_spot,
+        volatility_grid=volatility_grid,
+        value_by_volatility=value_by_volatility,
+    )
+
+
+_COLORS = {
+    "ink": "#172033",
+    "muted": "#596579",
+    "panel": "#ffffff",
+    "canvas": "#f3f6fa",
+    "border": "#dce3ec",
+    "call": "#1565c0",
+    "put": "#c62828",
+    "accent": "#00695c",
+}
+
+
+def _metric_card(label: str, value: str, note: str) -> html.Div:
+    return html.Div(
+        [
+            html.P(label, style={"margin": "0", "color": _COLORS["muted"]}),
+            html.Strong(
+                value,
+                style={"fontSize": "1.35rem", "color": _COLORS["ink"]},
+            ),
+            html.P(
+                note,
+                style={
+                    "margin": "0.25rem 0 0",
+                    "fontSize": "0.75rem",
+                    "color": _COLORS["muted"],
+                },
+            ),
+        ],
+        style={
+            "padding": "1rem",
+            "background": _COLORS["panel"],
+            "border": f"1px solid {_COLORS['border']}",
+            "borderRadius": "0.5rem",
+        },
+    )
+
+
+def _sensitivity_figures(analysis: ScenarioAnalysis) -> tuple[go.Figure, go.Figure]:
+    spot_figure = go.Figure()
+    spot_figure.add_scatter(
+        x=analysis.spot_grid,
+        y=analysis.call_by_spot,
+        mode="lines",
+        name="Call",
+        line={"color": _COLORS["call"]},
+    )
+    spot_figure.add_scatter(
+        x=analysis.spot_grid,
+        y=analysis.put_by_spot,
+        mode="lines",
+        name="Put",
+        line={"color": _COLORS["put"]},
+    )
+    spot_figure.add_vline(
+        x=analysis.spot,
+        line_dash="dot",
+        line_color=_COLORS["muted"],
+    )
+    spot_figure.update_layout(
+        title="Value by underlying price",
+        xaxis_title="Underlying price",
+        yaxis_title="Option value",
+        template="plotly_white",
+        margin={"l": 50, "r": 20, "t": 55, "b": 45},
+        legend={"orientation": "h"},
+    )
+
+    volatility_figure = go.Figure()
+    volatility_figure.add_scatter(
+        x=100.0 * analysis.volatility_grid,
+        y=analysis.value_by_volatility,
+        mode="lines",
+        name=analysis.option_type.value.capitalize(),
+        line={"color": _COLORS["accent"]},
+    )
+    volatility_figure.add_vline(
+        x=100.0 * analysis.volatility,
+        line_dash="dot",
+        line_color=_COLORS["muted"],
+    )
+    volatility_figure.update_layout(
+        title=f"{analysis.option_type.value.capitalize()} value by volatility",
+        xaxis_title="Annualized volatility (%)",
+        yaxis_title="Option value",
+        template="plotly_white",
+        margin={"l": 50, "r": 20, "t": 55, "b": 45},
+        showlegend=False,
+    )
+    return spot_figure, volatility_figure
+
+
+def render_analysis(
+    option_type: str,
+    spot: float | None,
+    strike: float | None,
+    time_to_expiry_days: float | None,
+    rate_percent: float | None,
+    volatility_percent: float | None,
+    dividend_yield_percent: float | None,
+) -> html.Div:
+    """Render validated dashboard output for a callback or integration test."""
+
+    required = {
+        "underlying price": spot,
+        "strike price": strike,
+        "time to expiry": time_to_expiry_days,
+        "risk-free rate": rate_percent,
+        "volatility": volatility_percent,
+    }
+    missing = [name for name, value in required.items() if value is None]
+    if missing:
+        return html.Div(
+            f"Missing required inputs: {', '.join(missing)}.",
+            role="alert",
+            style={"color": _COLORS["put"]},
+        )
+    assert spot is not None
+    assert strike is not None
+    assert time_to_expiry_days is not None
+    assert rate_percent is not None
+    assert volatility_percent is not None
+
+    try:
+        analysis = calculate_scenario(
+            option_type,
+            spot,
+            strike,
+            time_to_expiry_days,
+            rate_percent,
+            volatility_percent,
+            dividend_yield_percent or 0.0,
+        )
+    except (InputValidationError, TypeError, ValueError) as error:
+        return html.Div(
+            str(error),
+            role="alert",
+            style={"color": _COLORS["put"]},
+        )
+
+    risk = analysis.valuation.greeks
+    option_value = _scalar(analysis.valuation.price)
+    delta = _scalar(risk.delta)
+    gamma = _scalar(risk.gamma)
+    vega = _scalar(risk.vega)
+    theta = _scalar(risk.theta)
+    rho = _scalar(risk.rho)
+    spot_figure, volatility_figure = _sensitivity_figures(analysis)
+
+    return html.Div(
+        [
+            html.H2(
+                f"{analysis.option_type.value.capitalize()} value: "
+                f"${option_value:,.4f}",
+                style={"color": _COLORS["ink"]},
+            ),
+            html.Div(
+                [
+                    _metric_card("Delta", f"{delta:,.6f}", "per $1 spot move"),
+                    _metric_card("Gamma", f"{gamma:,.6f}", "Delta change per $1"),
+                    _metric_card("Vega", f"{vega / 100.0:,.6f}", "per 1 vol point"),
+                    _metric_card(
+                        "Theta",
+                        f"{theta / 365.0:,.6f}",
+                        "per calendar day",
+                    ),
+                    _metric_card("Rho", f"{rho / 100.0:,.6f}", "per 1 rate point"),
+                ],
+                style={
+                    "display": "grid",
+                    "gridTemplateColumns": "repeat(auto-fit, minmax(140px, 1fr))",
+                    "gap": "0.75rem",
+                },
+            ),
+            html.Div(
+                [
+                    dcc.Graph(figure=spot_figure),
+                    dcc.Graph(figure=volatility_figure),
+                ],
+                style={
+                    "display": "grid",
+                    "gridTemplateColumns": "repeat(auto-fit, minmax(320px, 1fr))",
+                    "gap": "1rem",
+                    "marginTop": "1rem",
+                },
+            ),
+            html.P(
+                "European exercise · continuous compounding · continuous dividend "
+                "yield · no transaction costs",
+                style={"color": _COLORS["muted"], "fontSize": "0.85rem"},
+            ),
+        ]
+    )
+
+
+def _number_input(
+    identifier: str,
+    label: str,
+    value: float,
+    *,
+    minimum: float | None = None,
+) -> html.Div:
+    return html.Div(
+        [
+            html.Label(
+                label,
+                htmlFor=identifier,
+                style={"fontWeight": "600", "color": _COLORS["ink"]},
+            ),
+            dcc.Input(
+                id=identifier,
+                type="number",
+                value=value,
+                min=minimum,
+                debounce=True,
+                style={
+                    "width": "100%",
+                    "padding": "0.65rem",
+                    "boxSizing": "border-box",
+                    "border": f"1px solid {_COLORS['border']}",
+                    "borderRadius": "0.35rem",
+                },
+            ),
+        ],
+        style={"marginBottom": "0.85rem"},
+    )
+
+
+def create_app() -> Dash:
+    """Create the Dash application without starting a server."""
+
+    app = Dash(__name__)
+    app.title = "Black-Scholes-Merton Analytics"
+    app.layout = html.Main(
+        [
+            html.Header(
+                [
+                    html.H1(
+                        "Black-Scholes-Merton Analytics",
+                        style={"marginBottom": "0.35rem"},
+                    ),
+                    html.P(
+                        "Deterministic European option valuation and analytic risk.",
+                        style={"marginTop": "0", "color": _COLORS["muted"]},
+                    ),
+                ]
+            ),
+            html.Div(
+                [
+                    html.Section(
+                        [
+                            html.H2("Model inputs"),
+                            html.Label(
+                                "Option type",
+                                htmlFor="option-type",
+                                style={"fontWeight": "600"},
+                            ),
+                            dcc.RadioItems(
+                                id="option-type",
+                                options=[
+                                    {"label": "Call", "value": "call"},
+                                    {"label": "Put", "value": "put"},
+                                ],
+                                value="call",
+                                inline=True,
+                                style={"margin": "0.5rem 0 1rem"},
+                            ),
+                            _number_input(
+                                "spot", "Underlying price", 100.0, minimum=0.0
+                            ),
+                            _number_input("strike", "Strike price", 100.0, minimum=0.0),
+                            _number_input(
+                                "time-days",
+                                "Time to expiry (days)",
+                                365.0,
+                                minimum=0.0,
+                            ),
+                            _number_input("rate", "Risk-free rate (%)", 5.0),
+                            _number_input(
+                                "volatility",
+                                "Annualized volatility (%)",
+                                20.0,
+                                minimum=0.0,
+                            ),
+                            _number_input("dividend-yield", "Dividend yield (%)", 0.0),
+                            html.Button(
+                                "Calculate",
+                                id="calculate",
+                                n_clicks=0,
+                                style={
+                                    "width": "100%",
+                                    "padding": "0.75rem",
+                                    "border": "none",
+                                    "borderRadius": "0.35rem",
+                                    "background": _COLORS["accent"],
+                                    "color": "white",
+                                    "fontWeight": "700",
+                                    "cursor": "pointer",
+                                },
+                            ),
+                        ],
+                        style={
+                            "background": _COLORS["panel"],
+                            "padding": "1.25rem",
+                            "border": f"1px solid {_COLORS['border']}",
+                            "borderRadius": "0.65rem",
+                        },
+                    ),
+                    html.Section(
+                        id="results",
+                        **{"aria-live": "polite"},  # type: ignore[arg-type]
+                    ),
+                ],
+                style={
+                    "display": "grid",
+                    "gridTemplateColumns": "minmax(240px, 300px) minmax(0, 1fr)",
+                    "gap": "1.5rem",
+                    "alignItems": "start",
+                },
+            ),
+        ],
+        style={
+            "maxWidth": "1280px",
+            "margin": "0 auto",
+            "padding": "1.5rem",
+            "fontFamily": "Inter, system-ui, sans-serif",
+            "color": _COLORS["ink"],
+        },
+    )
+
+    @app.callback(
+        Output("results", "children"),
+        Input("calculate", "n_clicks"),
+        State("option-type", "value"),
+        State("spot", "value"),
+        State("strike", "value"),
+        State("time-days", "value"),
+        State("rate", "value"),
+        State("volatility", "value"),
+        State("dividend-yield", "value"),
+    )
+    def update_results(
+        _clicks: int,
+        option_type: str,
+        spot: float | None,
+        strike: float | None,
+        time_days: float | None,
+        rate: float | None,
+        volatility: float | None,
+        dividend_yield: float | None,
+    ) -> html.Div:
+        return render_analysis(
+            option_type,
+            spot,
+            strike,
+            time_days,
+            rate,
+            volatility,
+            dividend_yield,
+        )
+
+    return app
+
+
+def main(**run_options: Any) -> None:
+    """Run the local development server."""
+
+    create_app().run(**run_options)
+
+
+if __name__ == "__main__":  # pragma: no cover - manual entry point
+    main(debug=True)
