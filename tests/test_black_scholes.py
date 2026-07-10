@@ -275,6 +275,54 @@ def test_prices_respect_no_arbitrage_bounds_across_grid() -> None:
         assert np.all(values <= upper + 1e-13)
 
 
+@pytest.mark.parametrize("option_type", list(OptionType))
+def test_prices_are_monotone_in_volatility_and_maturity(
+    option_type: OptionType,
+) -> None:
+    volatilities = np.linspace(0.0, 2.0, 101)
+    times = np.linspace(0.0, 5.0, 101)
+
+    by_volatility = price(option_type, 100.0, 110.0, 1.0, 0.0, volatilities)
+    by_maturity = price(option_type, 100.0, 110.0, times, 0.0, 0.3)
+
+    assert np.all(np.diff(by_volatility) >= -1e-13)
+    assert np.all(np.diff(by_maturity) >= -1e-13)
+
+
+def test_prices_have_expected_spot_and_strike_monotonicity() -> None:
+    grid = np.linspace(50.0, 150.0, 101)
+
+    calls_by_spot = price("call", grid, 100.0, 1.0, 0.02, 0.3)
+    puts_by_spot = price("put", grid, 100.0, 1.0, 0.02, 0.3)
+    calls_by_strike = price("call", 100.0, grid, 1.0, 0.02, 0.3)
+    puts_by_strike = price("put", 100.0, grid, 1.0, 0.02, 0.3)
+
+    assert np.all(np.diff(calls_by_spot) >= 0.0)
+    assert np.all(np.diff(puts_by_spot) <= 0.0)
+    assert np.all(np.diff(calls_by_strike) <= 0.0)
+    assert np.all(np.diff(puts_by_strike) >= 0.0)
+
+
+def test_randomized_put_call_parity_and_positive_gamma() -> None:
+    generator = np.random.default_rng(20260709)
+    size = 1_000
+    spots = np.exp(generator.uniform(np.log(1.0), np.log(1_000.0), size))
+    strikes = np.exp(generator.uniform(np.log(1.0), np.log(1_000.0), size))
+    times = generator.uniform(1e-6, 30.0, size)
+    rates = generator.uniform(-0.1, 0.2, size)
+    yields = generator.uniform(-0.05, 0.15, size)
+    volatilities = generator.uniform(1e-5, 3.0, size)
+
+    calls = price("call", spots, strikes, times, rates, volatilities, yields)
+    puts = price("put", spots, strikes, times, rates, volatilities, yields)
+    call_risk = greeks("call", spots, strikes, times, rates, volatilities, yields)
+    parity = spots * np.exp(-yields * times) - strikes * np.exp(-rates * times)
+
+    np.testing.assert_allclose(calls - puts, parity, rtol=2e-12, atol=2e-12)
+    assert np.all(call_risk.gamma >= 0.0)
+    assert np.all(call_risk.vega >= 0.0)
+
+
 def test_vectorized_inputs_broadcast_and_match_scalar_prices() -> None:
     spots = np.array([[80.0], [100.0], [120.0]])
     strikes = np.array([90.0, 100.0, 110.0, 120.0])
@@ -351,6 +399,17 @@ def test_invalid_option_type_and_shapes_raise_clear_errors() -> None:
             RATE,
             VOLATILITY,
         )
+
+
+def test_non_numeric_and_overflowing_discount_inputs_raise_clear_errors() -> None:
+    with pytest.raises(InputValidationError, match="spot must contain real numbers"):
+        price("call", "not-a-number", STRIKE, TIME, RATE, VOLATILITY)
+    with pytest.raises(InputValidationError, match="discount exponent exceeds"):
+        price("call", SPOT, STRIKE, 1e308, 1e308, VOLATILITY)
+    with pytest.raises(InputValidationError, match="rate produces"):
+        price("call", SPOT, STRIKE, 1.0, -1e3, VOLATILITY)
+    with pytest.raises(InputValidationError, match="dividend_yield produces"):
+        price("call", SPOT, STRIKE, 1.0, RATE, VOLATILITY, -1e3)
 
 
 @pytest.mark.parametrize(

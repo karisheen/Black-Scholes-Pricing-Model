@@ -162,9 +162,30 @@ def test_iteration_limit_failure_includes_diagnostics() -> None:
         )
 
 
+def test_volatility_bracket_tolerance_is_a_valid_stopping_criterion() -> None:
+    target = price("call", 100.0, 100.0, 1.0, 0.02, 0.4)
+    assert isinstance(target, float)
+
+    result = implied_volatility(
+        "call",
+        target,
+        100.0,
+        100.0,
+        1.0,
+        0.02,
+        volatility_tolerance=0.25,
+        price_tolerance=1e-15,
+    )
+
+    assert result.converged
+    assert result.bracket[1] - result.bracket[0] <= 0.25
+    assert result.bracket[0] <= result.volatility <= result.bracket[1]
+
+
 @pytest.mark.parametrize(
     ("keyword", "value", "message"),
     [
+        ("target_price", "invalid", "target_price must be a real scalar"),
         ("target_price", math.nan, "target_price must be finite"),
         ("time_to_expiry", 0.0, "volatility is undefined at expiry"),
         ("initial_guess", 0.0, "initial_guess must be strictly positive"),
@@ -175,13 +196,19 @@ def test_iteration_limit_failure_includes_diagnostics() -> None:
             math.inf,
             "volatility_tolerance must be finite",
         ),
+        (
+            "volatility_tolerance",
+            -1.0,
+            "volatility_tolerance must be strictly positive",
+        ),
+        ("max_iterations", True, "max_iterations must be an integer"),
         ("max_iterations", 0, "max_iterations must be strictly positive"),
     ],
 )
 def test_rejects_invalid_solver_inputs(
-    keyword: str, value: float, message: str
+    keyword: str, value: object, message: str
 ) -> None:
-    arguments: dict[str, float | str] = {
+    arguments: dict[str, object] = {
         "option_type": "call",
         "target_price": 10.0,
         "spot": 100.0,

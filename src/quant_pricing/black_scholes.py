@@ -131,8 +131,9 @@ def _validate_and_broadcast(
     if np.any(result.volatility < 0.0):
         raise InputValidationError("volatility cannot be negative")
 
-    rate_time = result.rate * result.time_to_expiry
-    yield_time = result.dividend_yield * result.time_to_expiry
+    with np.errstate(invalid="ignore", over="ignore"):
+        rate_time = result.rate * result.time_to_expiry
+        yield_time = result.dividend_yield * result.time_to_expiry
     if not np.all(np.isfinite(rate_time)) or not np.all(np.isfinite(yield_time)):
         raise InputValidationError(
             "rate or dividend discount exponent exceeds float range"
@@ -162,8 +163,6 @@ def _positive_difference(log_first: FloatArray, log_second: FloatArray) -> Float
 def _log_discounted_assets(inputs: _Inputs) -> tuple[FloatArray, FloatArray]:
     log_spot = np.log(inputs.spot) - inputs.dividend_yield * inputs.time_to_expiry
     log_strike = np.log(inputs.strike) - inputs.rate * inputs.time_to_expiry
-    if not np.all(np.isfinite(log_spot)) or not np.all(np.isfinite(log_strike)):
-        raise InputValidationError("discounted spot or strike exceeds float range")
     return log_spot, log_strike
 
 
@@ -173,7 +172,8 @@ def _standardized_terms(inputs: _Inputs) -> tuple[FloatArray, FloatArray]:
     log_forward_moneyness = (
         np.log(inputs.spot)
         - np.log(inputs.strike)
-        + (inputs.rate - inputs.dividend_yield) * inputs.time_to_expiry
+        + inputs.rate * inputs.time_to_expiry
+        - inputs.dividend_yield * inputs.time_to_expiry
     )
     with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
         d1_value = (
