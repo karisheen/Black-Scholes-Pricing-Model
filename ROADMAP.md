@@ -48,8 +48,8 @@ not by feature count.
    - [x] Verify batch results against scalar calculations.
 
 7. **Performance evidence** — Portfolio 4, Quant 3, Engineering 4, Effort 2.
-   - [ ] Add reproducible scalar and vectorized benchmarks.
-   - [ ] Quantify vectorization speedup without enforcing fragile timing gates.
+   - [x] Add reproducible scalar and vectorized benchmarks.
+   - [x] Quantify vectorization speedup without enforcing fragile timing gates.
 
 8. **Thin, deterministic user interfaces** — Portfolio 4, Quant 3,
    Engineering 4, Effort 3.
