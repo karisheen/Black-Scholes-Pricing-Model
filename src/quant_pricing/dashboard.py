@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -131,15 +132,29 @@ def calculate_scenario(
 
 
 _COLORS = {
-    "ink": "#172033",
-    "muted": "#596579",
-    "panel": "#ffffff",
-    "canvas": "#f3f6fa",
-    "border": "#dce3ec",
-    "call": "#1565c0",
-    "put": "#c62828",
-    "accent": "#00695c",
+    "ink": "var(--dashboard-ink)",
+    "muted": "var(--dashboard-muted)",
+    "panel": "var(--dashboard-panel)",
+    "canvas": "var(--dashboard-canvas)",
+    "border": "var(--dashboard-border)",
+    "input": "var(--dashboard-input)",
+    "accent": "var(--dashboard-accent)",
+    "danger": "var(--dashboard-danger)",
+    "button_text": "var(--dashboard-button-text)",
 }
+_PLOT_COLORS = {
+    "call": "#4c9aff",
+    "put": "#ef5350",
+    "accent": "#26a69a",
+    "marker": "#7b879c",
+}
+
+
+def theme_class_name(theme: str | None) -> str:
+    """Return the application class for a supported color theme."""
+
+    normalized = "dark" if theme == "dark" else "light"
+    return f"dashboard-shell theme-{normalized}"
 
 
 def _metric_card(label: str, value: str, note: str) -> html.Div:
@@ -168,32 +183,35 @@ def _metric_card(label: str, value: str, note: str) -> html.Div:
     )
 
 
-def _sensitivity_figures(analysis: ScenarioAnalysis) -> tuple[go.Figure, go.Figure]:
+def _sensitivity_figures(
+    analysis: ScenarioAnalysis, theme: str
+) -> tuple[go.Figure, go.Figure]:
+    template = "plotly_dark" if theme == "dark" else "plotly_white"
     spot_figure = go.Figure()
     spot_figure.add_scatter(
         x=analysis.spot_grid,
         y=analysis.call_by_spot,
         mode="lines",
         name="Call",
-        line={"color": _COLORS["call"]},
+        line={"color": _PLOT_COLORS["call"]},
     )
     spot_figure.add_scatter(
         x=analysis.spot_grid,
         y=analysis.put_by_spot,
         mode="lines",
         name="Put",
-        line={"color": _COLORS["put"]},
+        line={"color": _PLOT_COLORS["put"]},
     )
     spot_figure.add_vline(
         x=analysis.spot,
         line_dash="dot",
-        line_color=_COLORS["muted"],
+        line_color=_PLOT_COLORS["marker"],
     )
     spot_figure.update_layout(
         title="Value by underlying price",
         xaxis_title="Underlying price",
         yaxis_title="Option value",
-        template="plotly_white",
+        template=template,
         margin={"l": 50, "r": 20, "t": 55, "b": 45},
         legend={"orientation": "h"},
     )
@@ -204,18 +222,18 @@ def _sensitivity_figures(analysis: ScenarioAnalysis) -> tuple[go.Figure, go.Figu
         y=analysis.value_by_volatility,
         mode="lines",
         name=analysis.option_type.value.capitalize(),
-        line={"color": _COLORS["accent"]},
+        line={"color": _PLOT_COLORS["accent"]},
     )
     volatility_figure.add_vline(
         x=100.0 * analysis.volatility,
         line_dash="dot",
-        line_color=_COLORS["muted"],
+        line_color=_PLOT_COLORS["marker"],
     )
     volatility_figure.update_layout(
         title=f"{analysis.option_type.value.capitalize()} value by volatility",
         xaxis_title="Annualized volatility (%)",
         yaxis_title="Option value",
-        template="plotly_white",
+        template=template,
         margin={"l": 50, "r": 20, "t": 55, "b": 45},
         showlegend=False,
     )
@@ -230,6 +248,7 @@ def render_analysis(
     rate_percent: float | None,
     volatility_percent: float | None,
     dividend_yield_percent: float | None,
+    theme: str = "light",
 ) -> html.Div:
     """Render validated dashboard output for a callback or integration test."""
 
@@ -245,7 +264,7 @@ def render_analysis(
         return html.Div(
             f"Missing required inputs: {', '.join(missing)}.",
             role="alert",
-            style={"color": _COLORS["put"]},
+            style={"color": _COLORS["danger"]},
         )
     assert spot is not None
     assert strike is not None
@@ -267,7 +286,7 @@ def render_analysis(
         return html.Div(
             str(error),
             role="alert",
-            style={"color": _COLORS["put"]},
+            style={"color": _COLORS["danger"]},
         )
 
     risk = analysis.valuation.greeks
@@ -277,7 +296,8 @@ def render_analysis(
     vega = _scalar(risk.vega)
     theta = _scalar(risk.theta)
     rho = _scalar(risk.rho)
-    spot_figure, volatility_figure = _sensitivity_figures(analysis)
+    normalized_theme = "dark" if theme == "dark" else "light"
+    spot_figure, volatility_figure = _sensitivity_figures(analysis, normalized_theme)
 
     return html.Div(
         [
@@ -351,6 +371,8 @@ def _number_input(
                     "boxSizing": "border-box",
                     "border": f"1px solid {_COLORS['border']}",
                     "borderRadius": "0.35rem",
+                    "background": _COLORS["input"],
+                    "color": _COLORS["ink"],
                 },
             ),
         ],
@@ -361,108 +383,178 @@ def _number_input(
 def create_app() -> Dash:
     """Create the Dash application without starting a server."""
 
-    app = Dash(__name__)
+    assets_folder = Path(__file__).with_name("assets")
+    app = Dash(__name__, assets_folder=str(assets_folder))
     app.title = "Black-Scholes-Merton Analytics"
-    app.layout = html.Main(
-        [
-            html.Header(
+    app.layout = html.Div(
+        id="app-shell",
+        className=theme_class_name("light"),
+        children=[
+            html.Main(
                 [
-                    html.H1(
-                        "Black-Scholes-Merton Analytics",
-                        style={"marginBottom": "0.35rem"},
-                    ),
-                    html.P(
-                        "Deterministic European option valuation and analytic risk.",
-                        style={"marginTop": "0", "color": _COLORS["muted"]},
-                    ),
-                ]
-            ),
-            html.Div(
-                [
-                    html.Section(
+                    html.Header(
                         [
-                            html.H2("Model inputs"),
-                            html.Label(
-                                "Option type",
-                                htmlFor="option-type",
-                                style={"fontWeight": "600"},
+                            html.Div(
+                                [
+                                    html.H1(
+                                        "Black-Scholes-Merton Analytics",
+                                        style={"marginBottom": "0.35rem"},
+                                    ),
+                                    html.P(
+                                        "Deterministic European option valuation "
+                                        "and analytic risk.",
+                                        style={
+                                            "marginTop": "0",
+                                            "color": _COLORS["muted"],
+                                        },
+                                    ),
+                                ]
                             ),
-                            dcc.RadioItems(
-                                id="option-type",
-                                options=[
-                                    {"label": "Call", "value": "call"},
-                                    {"label": "Put", "value": "put"},
+                            html.Div(
+                                [
+                                    html.Label(
+                                        "Appearance",
+                                        htmlFor="theme-mode",
+                                        style={
+                                            "fontWeight": "600",
+                                            "fontSize": "0.85rem",
+                                        },
+                                    ),
+                                    dcc.RadioItems(
+                                        id="theme-mode",
+                                        options=[
+                                            {"label": "Light", "value": "light"},
+                                            {"label": "Dark", "value": "dark"},
+                                        ],
+                                        value="light",
+                                        inline=True,
+                                        persistence=True,
+                                        persistence_type="local",
+                                        style={"marginTop": "0.4rem"},
+                                    ),
                                 ],
-                                value="call",
-                                inline=True,
-                                style={"margin": "0.5rem 0 1rem"},
-                            ),
-                            _number_input(
-                                "spot", "Underlying price", 100.0, minimum=0.0
-                            ),
-                            _number_input("strike", "Strike price", 100.0, minimum=0.0),
-                            _number_input(
-                                "time-days",
-                                "Time to expiry (days)",
-                                365.0,
-                                minimum=0.0,
-                            ),
-                            _number_input("rate", "Risk-free rate (%)", 5.0),
-                            _number_input(
-                                "volatility",
-                                "Annualized volatility (%)",
-                                20.0,
-                                minimum=0.0,
-                            ),
-                            _number_input("dividend-yield", "Dividend yield (%)", 0.0),
-                            html.Button(
-                                "Calculate",
-                                id="calculate",
-                                n_clicks=0,
-                                style={
-                                    "width": "100%",
-                                    "padding": "0.75rem",
-                                    "border": "none",
-                                    "borderRadius": "0.35rem",
-                                    "background": _COLORS["accent"],
-                                    "color": "white",
-                                    "fontWeight": "700",
-                                    "cursor": "pointer",
-                                },
+                                style={"minWidth": "150px"},
                             ),
                         ],
+                        className="dashboard-header",
                         style={
-                            "background": _COLORS["panel"],
-                            "padding": "1.25rem",
-                            "border": f"1px solid {_COLORS['border']}",
-                            "borderRadius": "0.65rem",
+                            "display": "flex",
+                            "alignItems": "center",
+                            "justifyContent": "space-between",
+                            "gap": "1rem",
                         },
                     ),
-                    html.Section(
-                        id="results",
-                        **{"aria-live": "polite"},  # type: ignore[arg-type]
+                    html.Div(
+                        [
+                            html.Section(
+                                [
+                                    html.H2("Model inputs"),
+                                    html.Label(
+                                        "Option type",
+                                        htmlFor="option-type",
+                                        style={"fontWeight": "600"},
+                                    ),
+                                    dcc.RadioItems(
+                                        id="option-type",
+                                        options=[
+                                            {"label": "Call", "value": "call"},
+                                            {"label": "Put", "value": "put"},
+                                        ],
+                                        value="call",
+                                        inline=True,
+                                        style={"margin": "0.5rem 0 1rem"},
+                                    ),
+                                    _number_input(
+                                        "spot",
+                                        "Underlying price",
+                                        100.0,
+                                        minimum=0.0,
+                                    ),
+                                    _number_input(
+                                        "strike",
+                                        "Strike price",
+                                        100.0,
+                                        minimum=0.0,
+                                    ),
+                                    _number_input(
+                                        "time-days",
+                                        "Time to expiry (days)",
+                                        365.0,
+                                        minimum=0.0,
+                                    ),
+                                    _number_input("rate", "Risk-free rate (%)", 5.0),
+                                    _number_input(
+                                        "volatility",
+                                        "Annualized volatility (%)",
+                                        20.0,
+                                        minimum=0.0,
+                                    ),
+                                    _number_input(
+                                        "dividend-yield",
+                                        "Dividend yield (%)",
+                                        0.0,
+                                    ),
+                                    html.Button(
+                                        "Calculate",
+                                        id="calculate",
+                                        n_clicks=0,
+                                        style={
+                                            "width": "100%",
+                                            "padding": "0.75rem",
+                                            "border": "none",
+                                            "borderRadius": "0.35rem",
+                                            "background": _COLORS["accent"],
+                                            "color": _COLORS["button_text"],
+                                            "fontWeight": "700",
+                                            "cursor": "pointer",
+                                        },
+                                    ),
+                                ],
+                                style={
+                                    "background": _COLORS["panel"],
+                                    "padding": "1.25rem",
+                                    "border": f"1px solid {_COLORS['border']}",
+                                    "borderRadius": "0.65rem",
+                                },
+                            ),
+                            html.Section(
+                                id="results",
+                                **{"aria-live": "polite"},  # type: ignore[arg-type]
+                            ),
+                        ],
+                        className="dashboard-content-grid",
+                        style={
+                            "display": "grid",
+                            "gridTemplateColumns": (
+                                "minmax(240px, 300px) minmax(0, 1fr)"
+                            ),
+                            "gap": "1.5rem",
+                            "alignItems": "start",
+                        },
                     ),
                 ],
                 style={
-                    "display": "grid",
-                    "gridTemplateColumns": "minmax(240px, 300px) minmax(0, 1fr)",
-                    "gap": "1.5rem",
-                    "alignItems": "start",
+                    "maxWidth": "1280px",
+                    "margin": "0 auto",
+                    "padding": "1.5rem",
+                    "fontFamily": "Inter, system-ui, sans-serif",
+                    "color": _COLORS["ink"],
                 },
-            ),
+            )
         ],
-        style={
-            "maxWidth": "1280px",
-            "margin": "0 auto",
-            "padding": "1.5rem",
-            "fontFamily": "Inter, system-ui, sans-serif",
-            "color": _COLORS["ink"],
-        },
     )
+
+    @app.callback(
+        Output("app-shell", "className"),
+        Input("theme-mode", "value"),
+    )
+    def update_theme(theme: str | None) -> str:
+        return theme_class_name(theme)
 
     @app.callback(
         Output("results", "children"),
         Input("calculate", "n_clicks"),
+        Input("theme-mode", "value"),
         State("option-type", "value"),
         State("spot", "value"),
         State("strike", "value"),
@@ -473,6 +565,7 @@ def create_app() -> Dash:
     )
     def update_results(
         _clicks: int,
+        theme: str,
         option_type: str,
         spot: float | None,
         strike: float | None,
@@ -489,6 +582,7 @@ def create_app() -> Dash:
             rate,
             volatility,
             dividend_yield,
+            theme,
         )
 
     return app

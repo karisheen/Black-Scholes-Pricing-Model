@@ -182,12 +182,13 @@ Run the local dashboard:
 uv run black-scholes-dashboard
 ```
 
-The dashboard reports price and Greeks and plots vectorized spot and volatility
-sensitivities. It intentionally does not fetch equity prices or estimate
-volatility. The previous market-data path combined historical volatility with a
-hard-coded rate and labeled the output as real-time pricing; removing that
-non-reproducible workflow makes the model assumptions auditable. Market-data
-estimation belongs in a separate, timestamped data pipeline.
+The dashboard reports price and Greeks, plots vectorized spot and volatility
+sensitivities, and provides persistent light and dark appearance modes. It
+intentionally does not fetch equity prices or estimate volatility. The previous
+market-data path combined historical volatility with a hard-coded rate and
+labeled the output as real-time pricing; removing that non-reproducible workflow
+makes the model assumptions auditable. Market-data estimation belongs in a
+separate, timestamped data pipeline.
 
 The original `bs_call`, `bs_put`, `d1`, and `d2` names remain available through
 `BlackScholesPricingModel.py` for existing notebooks.

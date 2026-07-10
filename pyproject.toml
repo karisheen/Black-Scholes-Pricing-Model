@@ -54,7 +54,7 @@ package-dir = { "" = "src" }
 where = ["src"]
 
 [tool.setuptools.package-data]
-quant_pricing = ["py.typed"]
+quant_pricing = ["py.typed", "assets/*.css"]
 
 [tool.pytest.ini_options]
 addopts = [

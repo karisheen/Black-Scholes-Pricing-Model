@@ -14,6 +14,7 @@ from quant_pricing.dashboard import (
     calculate_scenario,
     create_app,
     render_analysis,
+    theme_class_name,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -72,11 +73,19 @@ def test_dashboard_scenario_uses_vectorized_core() -> None:
 
 def test_dashboard_renderer_handles_success_and_validation_errors() -> None:
     success = render_analysis("call", 100.0, 100.0, 365.0, 5.0, 20.0, 0.0)
+    dark = render_analysis("call", 100.0, 100.0, 365.0, 5.0, 20.0, 0.0, theme="dark")
     missing = render_analysis("call", None, 100.0, 365.0, 5.0, 20.0, 0.0)
     invalid = render_analysis("call", 0.0, 100.0, 365.0, 5.0, 20.0, 0.0)
 
     assert isinstance(success, html.Div)
     assert "Call value: $10.4506" in success.children[0].children
+    light_background = (
+        success.children[2].children[0].figure.layout.template.layout.paper_bgcolor
+    )
+    dark_background = (
+        dark.children[2].children[0].figure.layout.template.layout.paper_bgcolor
+    )
+    assert light_background != dark_background
     assert missing.role == "alert"
     assert "Missing required inputs" in missing.children
     assert invalid.role == "alert"
@@ -89,6 +98,13 @@ def test_dash_app_and_compatibility_entry_point_initialize() -> None:
 
     assert app.title == "Black-Scholes-Merton Analytics"
     assert app.layout is not None
-    assert len(app.callback_map) == 1
+    assert app.layout.className == "dashboard-shell theme-light"
+    assert len(app.callback_map) == 2
+    assert theme_class_name("dark") == "dashboard-shell theme-dark"
+    assert theme_class_name("unsupported") == "dashboard-shell theme-light"
+    assert (Path(app.config.assets_folder) / "dashboard.css").is_file()
+    stylesheet = app.server.test_client().get("/assets/dashboard.css")
+    assert stylesheet.status_code == 200
+    assert b".dashboard-shell.theme-dark" in stylesheet.data
     assert compatibility["app"].title == app.title
     assert compatibility["server"] is compatibility["app"].server
