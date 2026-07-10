@@ -175,7 +175,10 @@ def _log_discounted_assets(inputs: _Inputs) -> tuple[FloatArray, FloatArray]:
 
 def _total_volatility(inputs: _Inputs) -> FloatArray:
     with np.errstate(over="ignore", under="ignore"):
-        return inputs.volatility * np.sqrt(inputs.time_to_expiry)
+        return np.asarray(
+            inputs.volatility * np.sqrt(inputs.time_to_expiry),
+            dtype=np.float64,
+        )
 
 
 def _standardized_terms(inputs: _Inputs) -> tuple[FloatArray, FloatArray]:

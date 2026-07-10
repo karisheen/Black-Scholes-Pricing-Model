@@ -65,7 +65,9 @@ def test_dashboard_scenario_uses_vectorized_core() -> None:
     assert analysis.rate == 0.05
     assert analysis.volatility == 0.2
     assert analysis.spot_grid.shape == (161,)
+    assert analysis.spot_grid.dtype == np.float64
     assert analysis.volatility_grid.shape == (161,)
+    assert analysis.volatility_grid.dtype == np.float64
     assert np.all(np.diff(analysis.call_by_spot) >= 0.0)
     assert np.all(np.diff(analysis.put_by_spot) <= 0.0)
     assert np.all(np.diff(analysis.value_by_volatility) >= -1e-13)
