@@ -176,10 +176,9 @@ def _standardized_terms(inputs: _Inputs) -> tuple[FloatArray, FloatArray]:
         - inputs.dividend_yield * inputs.time_to_expiry
     )
     with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
-        d1_value = (
-            log_forward_moneyness + 0.5 * inputs.volatility**2 * inputs.time_to_expiry
-        ) / sigma_root_time
-    d2_value = d1_value - sigma_root_time
+        scaled_moneyness = log_forward_moneyness / sigma_root_time
+        d1_value = scaled_moneyness + 0.5 * sigma_root_time
+        d2_value = scaled_moneyness - 0.5 * sigma_root_time
     return d1_value, d2_value
 
 
@@ -366,12 +365,15 @@ def greeks(
         safe_time = np.where(regular, inputs.time_to_expiry, 1.0)
         safe_volatility = np.where(regular, inputs.volatility, 1.0)
         root_time = np.sqrt(safe_time)
-        density = np.exp(-0.5 * first**2) / _SQRT_TWO_PI
-        common_theta = -discounted_spot * density * safe_volatility / (2.0 * root_time)
-        regular_gamma = (
-            discount_yield * density / (inputs.spot * safe_volatility * root_time)
-        )
-        regular_vega = discounted_spot * density * root_time
+        with np.errstate(over="ignore", under="ignore"):
+            density = np.exp(-0.5 * first**2) / _SQRT_TWO_PI
+            common_theta = (
+                -discounted_spot * density * safe_volatility / (2.0 * root_time)
+            )
+            regular_gamma = (
+                discount_yield * density / (inputs.spot * safe_volatility * root_time)
+            )
+            regular_vega = discounted_spot * density * root_time
         if kind is OptionType.CALL:
             regular_delta = discount_yield * ndtr(first)
             regular_rho = (

@@ -436,3 +436,20 @@ def test_near_expiry_and_extreme_tail_prices_remain_nonnegative_and_finite() -> 
     assert deep_out_of_money >= 0.0
     assert math.isfinite(deep_in_the_money)
     assert deep_in_the_money >= 0.0
+
+
+def test_extreme_total_variance_uses_finite_limiting_values_without_warnings() -> None:
+    with np.errstate(all="raise"):
+        first, second = d1_d2(100.0, 100.0, 1e200, 0.0, 1e200)
+        call = price("call", 100.0, 100.0, 1e200, 0.0, 1e200)
+        put = price("put", 100.0, 100.0, 1e200, 0.0, 1e200)
+        risk = greeks("call", 100.0, 100.0, 1e200, 0.0, 1e200)
+
+    assert first > 0.0
+    assert second < 0.0
+    assert call == pytest.approx(100.0)
+    assert put == pytest.approx(100.0)
+    assert all(
+        math.isfinite(metric)
+        for metric in (risk.delta, risk.gamma, risk.vega, risk.theta, risk.rho)
+    )
