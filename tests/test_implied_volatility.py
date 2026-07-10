@@ -47,6 +47,7 @@ def test_recovers_volatility_across_regimes(
         dividend_yield,
         initial_guess=0.3,
         price_tolerance=1e-11,
+        relative_price_tolerance=0.0,
         volatility_tolerance=1e-12,
     )
 
@@ -57,6 +58,7 @@ def test_recovers_volatility_across_regimes(
     assert abs(result.residual) <= 1e-9
     assert result.iterations <= 100
     assert result.method == "safeguarded-newton"
+    assert math.isfinite(result.normalized_residual)
 
 
 def test_intrinsic_bound_maps_to_zero_volatility() -> None:
@@ -69,6 +71,7 @@ def test_intrinsic_bound_maps_to_zero_volatility() -> None:
     assert result.iterations == 0
     assert result.residual == 0.0
     assert result.bracket == (0.0, 0.0)
+    assert result.termination_reason == "lower_bound"
 
 
 @pytest.mark.parametrize(
@@ -158,8 +161,29 @@ def test_iteration_limit_failure_includes_diagnostics() -> None:
             initial_guess=4.0,
             max_iterations=1,
             price_tolerance=1e-15,
+            relative_price_tolerance=0.0,
             volatility_tolerance=1e-15,
         )
+
+
+def test_candidate_evaluated_on_final_iteration_can_converge() -> None:
+    result = implied_volatility(
+        "call",
+        10.450583572185565,
+        100.0,
+        100.0,
+        1.0,
+        0.05,
+        initial_guess=0.3,
+        max_iterations=29,
+        price_tolerance=1e-12,
+        relative_price_tolerance=0.0,
+        volatility_tolerance=1e-15,
+    )
+
+    assert result.volatility == pytest.approx(0.2, abs=1e-14)
+    assert abs(result.residual) <= 1e-12
+    assert result.iterations == 29
 
 
 def test_volatility_bracket_tolerance_is_a_valid_stopping_criterion() -> None:
@@ -175,11 +199,62 @@ def test_volatility_bracket_tolerance_is_a_valid_stopping_criterion() -> None:
         0.02,
         volatility_tolerance=0.25,
         price_tolerance=1e-15,
+        relative_price_tolerance=0.0,
     )
 
     assert result.converged
     assert result.bracket[1] - result.bracket[0] <= 0.25
     assert result.bracket[0] <= result.volatility <= result.bracket[1]
+
+
+@pytest.mark.parametrize("scale", [1e-12, 1.0, 1e12, 1e20])
+def test_implied_volatility_is_invariant_to_monetary_units(scale: float) -> None:
+    # Independently evaluated with the standard-library erf normal CDF for
+    # S=K=1, T=1, r=2%, q=0, and sigma=30%.
+    normalized_reference_price = 0.12821581392691417
+
+    result = implied_volatility(
+        "call",
+        normalized_reference_price * scale,
+        scale,
+        scale,
+        1.0,
+        0.02,
+    )
+
+    assert result.volatility == pytest.approx(0.3, abs=2e-11)
+    assert abs(result.normalized_residual) <= 2e-12
+    assert result.price_scale == pytest.approx(scale)
+
+
+def test_external_reference_price_recovers_known_volatility() -> None:
+    result = implied_volatility(
+        "call",
+        10.450583572185565,
+        100.0,
+        100.0,
+        1.0,
+        0.05,
+        relative_price_tolerance=1e-13,
+        volatility_tolerance=1e-13,
+    )
+
+    assert result.volatility == pytest.approx(0.2, abs=1e-12)
+    assert result.termination_reason == "price_residual"
+
+
+def test_at_least_one_price_tolerance_must_be_positive() -> None:
+    with pytest.raises(InputValidationError, match="at least one"):
+        implied_volatility(
+            "call",
+            10.0,
+            100.0,
+            100.0,
+            1.0,
+            0.02,
+            price_tolerance=0.0,
+            relative_price_tolerance=0.0,
+        )
 
 
 @pytest.mark.parametrize(
@@ -190,7 +265,12 @@ def test_volatility_bracket_tolerance_is_a_valid_stopping_criterion() -> None:
         ("time_to_expiry", 0.0, "volatility is undefined at expiry"),
         ("initial_guess", 0.0, "initial_guess must be strictly positive"),
         ("max_volatility", -1.0, "max_volatility must be strictly positive"),
-        ("price_tolerance", 0.0, "price_tolerance must be strictly positive"),
+        ("price_tolerance", -1.0, "price_tolerance cannot be negative"),
+        (
+            "relative_price_tolerance",
+            -1.0,
+            "relative_price_tolerance cannot be negative",
+        ),
         (
             "volatility_tolerance",
             math.inf,

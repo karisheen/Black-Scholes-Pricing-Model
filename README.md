@@ -77,13 +77,18 @@ bounds:
 
 with the analogous put bounds. The solver expands a volatility bracket, accepts
 Newton updates only inside a safeguarded interior, and otherwise bisects.
-Success returns volatility, iteration count, residual, final bracket, and the
-repriced value. Bound violations, infinite-volatility limits, bracket failures,
-and iteration failures are distinct exceptions.
+Success returns volatility, iteration count, residual, normalized residual,
+termination reason, final bracket, and the repriced value. Bound violations,
+infinite-volatility limits, bracket failures, and iteration failures are
+distinct exceptions.
 
-Convergence is primarily measured in price space. This matters for low-Vega
-options: a tiny price residual does not imply many meaningful decimal places of
-implied volatility.
+Price convergence combines an absolute tolerance with a relative tolerance
+times a no-arbitrage-bound-derived monetary scale. The default absolute
+tolerance is zero, making identical economics produce the same implied
+volatility whether prices are quoted in dollars, cents, or normalized notional
+units. A narrow volatility bracket is a separate, explicitly reported stopping
+condition. This distinction matters for low-Vega options: a tiny normalized
+price residual does not imply many meaningful decimal places of volatility.
 
 ## Installation
 
@@ -157,7 +162,8 @@ solution = implied_volatility(
 )
 
 print(solution.volatility)  # approximately 0.20
-print(solution.residual, solution.iterations, solution.bracket)
+print(solution.normalized_residual, solution.termination_reason)
+print(solution.iterations, solution.bracket)
 ```
 
 ## Applications
@@ -205,7 +211,8 @@ The test suite validates:
 - deterministic randomized parity across broad parameter ranges;
 - extreme moneyness, near expiry, zero volatility, negative rates, malformed
   inputs, and non-broadcastable arrays;
-- implied-volatility recovery and every documented failure regime; and
+- implied-volatility recovery and every documented failure regime;
+- monetary-scale invariance and final-iteration convergence in the solver; and
 - CLI, compatibility wrapper, dashboard calculation, layout, and callback
   initialization.
 
