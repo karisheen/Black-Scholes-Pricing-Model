@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import runpy
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pytest
 from dash import html
 
+from quant_pricing import price
 from quant_pricing.cli import main as cli_main
 from quant_pricing.dashboard import (
     calculate_scenario,
@@ -94,6 +96,97 @@ def test_dashboard_renderer_handles_success_and_validation_errors() -> None:
     assert "spot must be strictly positive" in invalid.children
 
 
+def test_dashboard_recovers_iv_with_day_and_percent_inputs() -> None:
+    premium = price("put", 110.0, 100.0, 0.5, 0.045, 0.27, 0.02)
+    assert isinstance(premium, float)
+    results = render_analysis(
+        "put", 110.0, 100.0, 182.5, 4.5, None, 2.0, mode="iv", premium=premium
+    )
+    assert results.children[0].children == "Put implied volatility: 27.0000%"
+
+
+def test_dashboard_iv_distinguishes_zero_premium_from_missing_premium() -> None:
+    zero = render_analysis(
+        "put", 110.0, 100.0, 365.0, 5.0, None, 0.0, mode="iv", premium=0.0
+    )
+    missing = render_analysis("put", 110.0, 100.0, 365.0, 5.0, None, 0.0, mode="iv")
+
+    assert zero.children[0].children == "Put implied volatility: 0.0000%"
+    assert missing.role == "alert"
+    assert "option premium" in missing.children
+
+
+@pytest.mark.parametrize(
+    ("premium", "message"),
+    [(100.0, "requires infinite volatility"), (101.0, "outside no-arbitrage bounds")],
+)
+def test_dashboard_iv_reports_unsolvable_premiums(premium: float, message: str) -> None:
+    results = render_analysis(
+        "call", 100.0, 100.0, 365.0, 5.0, None, 0.0, mode="iv", premium=premium
+    )
+    assert results.role == "alert"
+    assert message in results.children
+
+
+def test_theme_switch_preserves_last_calculated_scenario_with_pending_edits() -> None:
+    client = create_app().server.test_client()
+    callbacks = client.get("/_dash-dependencies").get_json()
+    values: dict[str, Any] = {
+        "calculate.n_clicks": 1,
+        "pricing-mode.value": "price",
+        "option-type.value": "call",
+        "spot.value": 100.0,
+        "strike.value": 100.0,
+        "time-days.value": 365.0,
+        "rate.value": 5.0,
+        "volatility.value": 20.0,
+        "dividend-yield.value": 0.0,
+        "premium.value": None,
+        "theme-mode.value": "light",
+    }
+
+    def update(output: str, changed: str) -> Any:
+        callback = next(item for item in callbacks if item["output"] == output)
+
+        def arguments(kind: str) -> list[dict[str, Any]]:
+            return [
+                {**arg, "value": values[f"{arg['id']}.{arg['property']}"]}
+                for arg in callback[kind]
+            ]
+
+        identifier, prop = output.split(".")
+        response = client.post(
+            "/_dash-update-component",
+            json={
+                "output": output,
+                "outputs": {"id": identifier, "property": prop},
+                "inputs": arguments("inputs"),
+                "state": arguments("state"),
+                "changedPropIds": [changed],
+            },
+        )
+        assert response.status_code == 200
+        return response.get_json()["response"][identifier][prop]
+
+    values["submitted-scenario.data"] = update(
+        "submitted-scenario.data", "calculate.n_clicks"
+    )
+    values["spot.value"] = 110.0
+    values["theme-mode.value"] = "dark"
+    themed = update("results.children", "theme-mode.value")
+    assert themed["props"]["children"][0]["props"]["children"] == "Call value: $10.4506"
+
+    values["calculate.n_clicks"] = 2
+    values["submitted-scenario.data"] = update(
+        "submitted-scenario.data", "calculate.n_clicks"
+    )
+    recalculated = update("results.children", "submitted-scenario.data")
+    assert (
+        recalculated["props"]["children"][0]["props"]["children"]
+        == "Call value: $17.6630"
+    )
+
+
 def test_dash_app_and_compatibility_entry_point_initialize() -> None:
     app = create_app()
     compatibility = runpy.run_path(str(ROOT / "dashboard.py"))
@@ -101,7 +194,6 @@ def test_dash_app_and_compatibility_entry_point_initialize() -> None:
     assert app.title == "Black-Scholes-Merton Analytics"
     assert app.layout is not None
     assert app.layout.className == "dashboard-shell theme-light"
-    assert len(app.callback_map) == 2
     assert theme_class_name("dark") == "dashboard-shell theme-dark"
     assert theme_class_name("unsupported") == "dashboard-shell theme-light"
     assert (Path(app.config.assets_folder) / "dashboard.css").is_file()

@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, TypedDict
 
 import numpy as np
 import plotly.graph_objects as go
 from dash import Dash, Input, Output, State, dcc, html
+from dash.exceptions import PreventUpdate
 from numpy.typing import NDArray
 
 from quant_pricing.black_scholes import (
@@ -17,9 +18,23 @@ from quant_pricing.black_scholes import (
     price,
     value_and_greeks,
 )
-from quant_pricing.exceptions import InputValidationError
+from quant_pricing.exceptions import PricingError
+from quant_pricing.implied_volatility import ImpliedVolatilityResult, implied_volatility
 
 FloatArray = NDArray[np.float64]
+PricingMode = Literal["price", "iv"]
+
+
+class _SubmittedScenario(TypedDict):
+    mode: PricingMode
+    option_type: str
+    spot: float | None
+    strike: float | None
+    time_to_expiry_days: float | None
+    rate_percent: float | None
+    volatility_percent: float | None
+    dividend_yield_percent: float | None
+    premium: float | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -189,6 +204,49 @@ def _metric_card(label: str, value: str, note: str) -> html.Div:
     )
 
 
+_METRIC_GRID_STYLE = {
+    "display": "grid",
+    "gridTemplateColumns": "repeat(auto-fit, minmax(140px, 1fr))",
+    "gap": "0.75rem",
+}
+
+
+def _render_iv(option_type: str, solution: ImpliedVolatilityResult) -> html.Div:
+    return html.Div(
+        [
+            html.H2(
+                f"{option_type.capitalize()} implied volatility: "
+                f"{solution.volatility:.4%}",
+                style={"color": _COLORS["ink"]},
+            ),
+            html.Div(
+                [
+                    _metric_card(
+                        "Input premium", f"${solution.target_price:.10g}", "per unit"
+                    ),
+                    _metric_card(
+                        "Model premium", f"${solution.model_price:.10g}", "per unit"
+                    ),
+                    _metric_card(
+                        "Residual", f"{solution.residual:+.3e}", "model - input"
+                    ),
+                    _metric_card(
+                        "Iterations",
+                        str(solution.iterations),
+                        solution.termination_reason.replace("_", " "),
+                    ),
+                ],
+                style=_METRIC_GRID_STYLE,
+            ),
+            html.P(
+                "Annualized volatility implied by the supplied premium under "
+                "European exercise and continuous dividend yield.",
+                style={"color": _COLORS["muted"], "fontSize": "0.85rem"},
+            ),
+        ]
+    )
+
+
 def _sensitivity_figures(
     analysis: ScenarioAnalysis, theme: str
 ) -> tuple[go.Figure, go.Figure]:
@@ -255,6 +313,9 @@ def render_analysis(
     volatility_percent: float | None,
     dividend_yield_percent: float | None,
     theme: str = "light",
+    *,
+    mode: PricingMode = "price",
+    premium: float | None = None,
 ) -> html.Div:
     """Render validated dashboard output for a callback or integration test."""
 
@@ -263,7 +324,9 @@ def render_analysis(
         "strike price": strike,
         "time to expiry": time_to_expiry_days,
         "risk-free rate": rate_percent,
-        "volatility": volatility_percent,
+        "option premium" if mode == "iv" else "volatility": (
+            premium if mode == "iv" else volatility_percent
+        ),
     }
     missing = [name for name, value in required.items() if value is None]
     if missing:
@@ -276,9 +339,22 @@ def render_analysis(
     assert strike is not None
     assert time_to_expiry_days is not None
     assert rate_percent is not None
-    assert volatility_percent is not None
 
     try:
+        if mode == "iv":
+            assert premium is not None
+            solution = implied_volatility(
+                option_type,
+                premium,
+                spot,
+                strike,
+                time_to_expiry_days / 365.0,
+                rate_percent / 100.0,
+                (dividend_yield_percent or 0.0) / 100.0,
+            )
+            return _render_iv(option_type, solution)
+
+        assert volatility_percent is not None
         analysis = calculate_scenario(
             option_type,
             spot,
@@ -288,7 +364,7 @@ def render_analysis(
             volatility_percent,
             dividend_yield_percent or 0.0,
         )
-    except (InputValidationError, TypeError, ValueError) as error:
+    except (PricingError, TypeError, ValueError) as error:
         return html.Div(
             str(error),
             role="alert",
@@ -324,11 +400,7 @@ def render_analysis(
                     ),
                     _metric_card("Rho", f"{rho / 100.0:,.6f}", "per 1 rate point"),
                 ],
-                style={
-                    "display": "grid",
-                    "gridTemplateColumns": "repeat(auto-fit, minmax(140px, 1fr))",
-                    "gap": "0.75rem",
-                },
+                style=_METRIC_GRID_STYLE,
             ),
             html.Div(
                 [
@@ -354,9 +426,10 @@ def render_analysis(
 def _number_input(
     identifier: str,
     label: str,
-    value: float,
+    value: float | None,
     *,
     minimum: float | None = None,
+    hidden: bool = False,
 ) -> html.Div:
     return html.Div(
         [
@@ -382,6 +455,8 @@ def _number_input(
                 },
             ),
         ],
+        id=f"{identifier}-field",
+        hidden=hidden,
         style={"marginBottom": "0.85rem"},
     )
 
@@ -396,6 +471,7 @@ def create_app() -> Dash:
         id="app-shell",
         className=theme_class_name("light"),
         children=[
+            dcc.Store(id="submitted-scenario"),
             html.Main(
                 [
                     html.Header(
@@ -437,6 +513,7 @@ def create_app() -> Dash:
                                         persistence=True,
                                         persistence_type="local",
                                         style={"marginTop": "0.4rem"},
+                                        labelStyle={"color": _COLORS["ink"]},
                                     ),
                                 ],
                                 style={"minWidth": "150px"},
@@ -456,6 +533,27 @@ def create_app() -> Dash:
                                 [
                                     html.H2("Model inputs"),
                                     html.Label(
+                                        "Calculation",
+                                        htmlFor="pricing-mode",
+                                        style={"fontWeight": "600"},
+                                    ),
+                                    dcc.RadioItems(
+                                        id="pricing-mode",
+                                        options=[
+                                            {
+                                                "label": "Price from volatility",
+                                                "value": "price",
+                                            },
+                                            {
+                                                "label": "IV from option premium",
+                                                "value": "iv",
+                                            },
+                                        ],
+                                        value="price",
+                                        style={"margin": "0.5rem 0 1rem"},
+                                        labelStyle={"color": _COLORS["ink"]},
+                                    ),
+                                    html.Label(
                                         "Option type",
                                         htmlFor="option-type",
                                         style={"fontWeight": "600"},
@@ -469,6 +567,7 @@ def create_app() -> Dash:
                                         value="call",
                                         inline=True,
                                         style={"margin": "0.5rem 0 1rem"},
+                                        labelStyle={"color": _COLORS["ink"]},
                                     ),
                                     _number_input(
                                         "spot",
@@ -494,6 +593,13 @@ def create_app() -> Dash:
                                         "Annualized volatility (%)",
                                         20.0,
                                         minimum=0.0,
+                                    ),
+                                    _number_input(
+                                        "premium",
+                                        "Option premium",
+                                        None,
+                                        minimum=0.0,
+                                        hidden=True,
                                     ),
                                     _number_input(
                                         "dividend-yield",
@@ -546,7 +652,7 @@ def create_app() -> Dash:
                     "fontFamily": "Inter, system-ui, sans-serif",
                     "color": _COLORS["ink"],
                 },
-            )
+            ),
         ],
     )
 
@@ -558,9 +664,17 @@ def create_app() -> Dash:
         return theme_class_name(theme)
 
     @app.callback(
-        Output("results", "children"),
+        Output("volatility-field", "hidden"),
+        Output("premium-field", "hidden"),
+        Input("pricing-mode", "value"),
+    )
+    def update_fields(mode: PricingMode) -> tuple[bool, bool]:
+        return mode == "iv", mode != "iv"
+
+    @app.callback(
+        Output("submitted-scenario", "data"),
         Input("calculate", "n_clicks"),
-        Input("theme-mode", "value"),
+        State("pricing-mode", "value"),
         State("option-type", "value"),
         State("spot", "value"),
         State("strike", "value"),
@@ -568,10 +682,11 @@ def create_app() -> Dash:
         State("rate", "value"),
         State("volatility", "value"),
         State("dividend-yield", "value"),
+        State("premium", "value"),
     )
-    def update_results(
+    def submit_scenario(
         _clicks: int,
-        theme: str,
+        mode: PricingMode,
         option_type: str,
         spot: float | None,
         strike: float | None,
@@ -579,17 +694,29 @@ def create_app() -> Dash:
         rate: float | None,
         volatility: float | None,
         dividend_yield: float | None,
-    ) -> html.Div:
-        return render_analysis(
-            option_type,
-            spot,
-            strike,
-            time_days,
-            rate,
-            volatility,
-            dividend_yield,
-            theme,
-        )
+        premium: float | None,
+    ) -> _SubmittedScenario:
+        return {
+            "mode": mode,
+            "option_type": option_type,
+            "spot": spot,
+            "strike": strike,
+            "time_to_expiry_days": time_days,
+            "rate_percent": rate,
+            "volatility_percent": volatility,
+            "dividend_yield_percent": dividend_yield,
+            "premium": premium,
+        }
+
+    @app.callback(
+        Output("results", "children"),
+        Input("submitted-scenario", "data"),
+        Input("theme-mode", "value"),
+    )
+    def update_results(submitted: _SubmittedScenario | None, theme: str) -> html.Div:
+        if submitted is None:
+            raise PreventUpdate
+        return render_analysis(**submitted, theme=theme)
 
     return app
 

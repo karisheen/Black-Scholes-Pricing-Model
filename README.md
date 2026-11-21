@@ -182,13 +182,19 @@ Run the local dashboard:
 uv run black-scholes-dashboard
 ```
 
-The dashboard reports price and Greeks, plots vectorized spot and volatility
-sensitivities, and provides persistent light and dark appearance modes. It
-intentionally does not fetch equity prices or estimate volatility. The previous
-market-data path combined historical volatility with a hard-coded rate and
-labeled the output as real-time pricing; removing that non-reproducible workflow
-makes the model assumptions auditable. Market-data estimation belongs in a
-separate, timestamped data pipeline.
+Choose **Price from volatility** to see the theoretical price, Greeks, and
+spot and volatility sensitivity charts. Choose **IV from option premium** to
+solve for annualized implied volatility from a supplied premium per unit (not
+the total contract cost). The result includes the model premium, signed
+repricing residual, iteration count, and stopping reason.
+
+The app opens with a default valuation. Click **Calculate** to apply changes
+to the mode or inputs. The persistent light/dark setting restyles the last
+calculated result without applying pending edits.
+
+The dashboard does not fetch market data or estimate volatility from stock
+returns. Supply your own inputs; timestamped quote acquisition belongs in a
+separate data pipeline.
 
 The original `bs_call`, `bs_put`, `d1`, and `d2` names remain available through
 `BlackScholesPricingModel.py` for existing notebooks.
