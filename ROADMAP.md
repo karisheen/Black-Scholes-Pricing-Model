@@ -134,40 +134,43 @@ risk engine. All acceptance tests can run on generated chains.
 
 13. **Implied-volatility chain and surface engine** — Portfolio 5, Quant 5,
     Engineering 5, Effort 5.
-    - [ ] Generate arbitrage-free synthetic chains from known smiles and inject
+    - [x] Generate arbitrage-free synthetic chains from known smiles and inject
       controlled noise, missing strikes, stale quotes, and crossed markets.
-    - [ ] Solve bid, midpoint, and ask implied volatility across complete
+    - [x] Solve bid, midpoint, and ask implied volatility across complete
       chains with per-contract diagnostics.
-    - [ ] Fit liquidity-weighted SVI smiles by expiry and interpolate total
+    - [x] Fit liquidity-weighted SVI smiles by expiry and interpolate total
       variance across maturities.
-    - [ ] Detect strike, butterfly, and calendar arbitrage and expose rejected
-      quotes and fit residuals.
-    - [ ] Support forward moneyness, delta coordinates, and explicit
+    - [x] Check strike, butterfly, and calendar arbitrage on declared grids
+      and expose rejected quotes and fit residuals.
+    - [x] Support forward moneyness, delta coordinates, and explicit
       interpolation and extrapolation policies.
-    - [ ] Test parameter recovery and no-arbitrage invariants against generated
+    - [x] Test parameter recovery and no-arbitrage invariants against generated
       surfaces.
 
 14. **Portfolio, inventory, and scenario risk** — Portfolio 5, Quant 5,
     Engineering 4, Effort 4.
-    - [ ] Aggregate price and Greeks by portfolio, underlying, expiry, strike,
+    - [x] Aggregate price and Greeks by portfolio, underlying, expiry, strike,
       and volatility bucket.
-    - [ ] Add Vanna, Volga/Vomma, Charm, Speed, and Color with documented units
+    - [x] Add Vanna, Volga/Vomma, Charm, Speed, and Color with documented units
       and finite-difference validation.
-    - [ ] Run spot, volatility, time, rate, skew, and curvature shocks against
+    - [x] Run spot, volatility, time, rate, skew, and curvature shocks against
       positions and surfaces.
-    - [ ] Explain P&L through Delta, Gamma, Vega, Theta, carry, trades, and an
+    - [x] Explain P&L through Delta, Gamma, Vega, Theta, carry, trades, and an
       explicit residual.
-    - [ ] Enforce configurable position, notional, Delta, Gamma, and Vega limits.
+    - [x] Enforce configurable position, notional, Delta, Gamma, and Vega limits.
 
 15. **Listed-option exercise and dividend models** — Portfolio 4, Quant 5,
     Engineering 4, Effort 5.
-    - [ ] Implement a binomial reference model for European and American
+    - [x] Implement a binomial reference model for European and American
       exercise with discrete dividends.
-    - [ ] Report early-exercise boundaries and exercise/assignment exposure.
-    - [ ] Verify European tree convergence to analytic prices and test American
+    - [x] Report early-exercise boundaries and modeled exercise/assignment
+      exposure.
+    - [x] Verify European tree convergence to analytic prices and test American
       no-arbitrage inequalities.
-    - [ ] Keep the tree as an independent validation model rather than mixing
+    - [x] Keep the tree as an independent validation model rather than mixing
       it into the analytic Black–Scholes implementation.
+
+    See [implementation decisions and reproducible workflow](IMPLEMENTATION_SUMMARY.md#p3--volatility-and-portfolio-analytics).
 
 ## P4 — Free live crypto-options data
 
