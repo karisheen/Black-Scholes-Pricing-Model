@@ -262,6 +262,56 @@ The report includes bid/ask-implied forward intervals and carries a separate
 spot-derived forward benchmark. It withholds IV or parity calculations that
 depend on an unavailable, invalid, stale, crossed, or sequence-gapped quote.
 
+### Historical Deribit order-book replay
+
+Download a two-minute [free Tardis sample](https://docs.tardis.dev/historical-data-details/deribit)
+to a private directory outside the repository. This reads a historical feed,
+not the live Deribit API. No credential is needed for this first-of-month sample.
+
+```bash
+capture=$(mktemp "${TMPDIR:-/tmp}/tardis-deribit.XXXXXX")
+curl -fsS --compressed --get 'https://api.tardis.dev/v1/data-feeds/deribit' \
+  --data-urlencode 'from=2024-01-01' \
+  --data-urlencode 'sliceSize=2' \
+  --data-urlencode 'filters=[{"channel":"book","symbols":["BTC-29MAR24-45000-C","BTC-29MAR24-45000-P","BTC-29MAR24-46000-C"]}]' \
+  --output "$capture" &&
+uv run python -m quant_pricing.tardis_deribit "$capture" \
+  --symbol BTC-29MAR24-45000-C \
+  --symbol BTC-29MAR24-45000-P \
+  --symbol BTC-29MAR24-46000-C \
+  --as-of 2024-01-01T00:00:20Z \
+  --as-of 2024-01-01T00:00:30.4Z \
+  --as-of 2024-01-01T00:00:31Z
+```
+
+The report shows a usable three-book snapshot, a disconnect with quotes
+withheld, and fresh snapshots on recovery. Repeat the command on the same
+bytes to reproduce the result. `--as-of` cutoffs are inclusive, strictly
+increasing UTC times; queries after the last dated frame fail.
+
+Removing one update from this sample also produced a gap for only the affected
+instrument. Its next full snapshot restored a usable book.
+
+- Use contiguous **raw** Tardis capture slices, not CSV, grouped books, or
+  concatenated noncontiguous downloads. Replay follows capture receipt order,
+  retaining fractional timestamp precision and file order for ties. It also
+  reports venue time and withholds state if any applied dependency is dated
+  after the cutoff. Tardis receipt time represents the vendor's observation
+  clock, not when this project downloaded the file.
+- A change must link to the last accepted venue ID; the ID need not increment
+  by one. A broken link invalidates only that instrument. An untimestamped
+  Tardis disconnect marker conservatively invalidates all requested books just
+  after the preceding receipt (or in file order for equal receipt times).
+  The marker does **not** identify the precise outage time. Recovery requires a
+  new snapshot for each affected instrument.
+- Prices and amounts are native decimal strings. Stale, crossed, and
+  one-sided books are flagged, not counted as complete. This sample is for
+  book reconstruction only: it is not a normalized `MarketSnapshot`, a
+  linear Black–76 input, or execution evidence.
+- Keep the capture and event-level output private under the
+  [Tardis licence](https://docs.tardis.dev/legal/terms-of-service#9-licence).
+  Tests use synthetic frames, not redistributed market data.
+
 ### Synthetic surface, portfolio, and exercise workflow
 
 ```bash
@@ -318,6 +368,7 @@ src/quant_pricing/
 ├── implied_volatility.py    # safeguarded scalar root solve
 ├── market.py               # instruments, quotes, and as-of snapshot contract
 ├── replay.py                # synthetic provider and optional Parquet archive
+├── tardis_deribit.py        # native historical book reconstruction and CLI
 ├── parity.py                # parity and conditional carry diagnostics
 ├── treasury.py              # Federal Reserve GSW zero-yield adapter
 ├── synthetic_chain.py       # deterministic SSVI chains and injected quote faults

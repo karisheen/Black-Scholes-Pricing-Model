@@ -186,6 +186,9 @@ free archive is not assumed.
       grouped order books, trades, open interest, and settlement prices.
     - [ ] Maintain books from snapshots and incremental updates with sequence
       and reconnect-gap validation.
+      The [historical Tardis replay workflow](README.md#historical-deribit-order-book-replay)
+      verifies book reconstruction and recovery offline. Live collection,
+      normalized archival, and venue-specific data rights are still open.
     - [ ] Persist raw and normalized events continuously, then add ETH after the
       BTC pipeline passes replay and recovery checks.
     - [ ] Compare independent prices, implied volatilities, and Greeks with
