@@ -16,14 +16,17 @@ testing, and measured performance.
 - Stable log-CDF tail evaluation for extreme moneyness
 - Typed command-line and Dash interfaces that delegate to the pricing package
 - Immutable market-data contracts and an offline, as-of bid/ask IV example
+- Dated curves, Black-76 pricing and IV, and bid/ask parity diagnostics
+- Optional partitioned Parquet ingestion and causal snapshot replay
 - Regression, finite-difference, parity, monotonicity, randomized invariant,
   edge-case, and integration tests
 - Ruff formatting/linting, strict mypy checks, locked dependencies, and CI
 
 The deliberate focus is depth, not model count. American exercise, stochastic
 volatility, Monte Carlo, trees, and volatility surfaces are not presented as
-implemented features. See [ROADMAP.md](ROADMAP.md) for the ordered research
-backlog.
+implemented features. See [ROADMAP.md](ROADMAP.md) for remaining work and
+[IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md) for design decisions and
+reproducible workflows.
 
 ## Model and conventions
 
@@ -99,7 +102,7 @@ environment used by CI and the reference benchmark.
 ```bash
 git clone <repository-url>
 cd "Black Scholes Pricing Model"
-uv sync --extra dashboard --group dev --group benchmark
+uv sync --extra dashboard --extra replay --group dev --group benchmark
 ```
 
 For library-only use with `pip`:
@@ -113,6 +116,9 @@ Install the optional dashboard dependencies with:
 ```bash
 python -m pip install ".[dashboard]"
 ```
+
+Install `".[replay]"` for partitioned Parquet ingestion and replay. The pricing
+engine does not require PyArrow.
 
 ## Python API
 
@@ -238,6 +244,22 @@ positions are in contracts; underlying and forward sizes are in underlying
 units. Coin premiums can be represented and normalized in the domain model,
 but the IV workflow does not convert currencies or model inverse payoffs.
 
+For persistent replay, ingest into a fresh writable archive and rerun the same
+as-of query without `--ingest`:
+
+```bash
+uv run --extra replay python -m quant_pricing.option_chain \
+  examples/synthetic_option_chain.json --as-of 2025-01-01T12:00:30Z \
+  --archive /tmp/quant-chain-example --ingest
+uv run --extra replay python -m quant_pricing.option_chain \
+  examples/synthetic_option_chain.json --as-of 2025-01-01T12:00:30Z \
+  --archive /tmp/quant-chain-example
+```
+
+The report includes bid/ask-implied forward intervals and carries a separate
+spot-derived forward benchmark. It withholds IV or parity calculations that
+depend on an unavailable, invalid, stale, crossed, or sequence-gapped quote.
+
 ## Validation and quality checks
 
 ```bash
@@ -278,8 +300,14 @@ commands.
 ```text
 src/quant_pricing/
 ├── black_scholes.py         # deterministic pricing, bounds, and Greeks
+├── black76.py               # forward pricing, bounds, and IV
+├── conventions.py           # day-count and exchange calendar rules
+├── curves.py                # discount, forward, and cash-dividend curves
 ├── implied_volatility.py    # safeguarded scalar root solve
 ├── market.py               # instruments, quotes, and as-of snapshot contract
+├── replay.py                # synthetic provider and optional Parquet archive
+├── parity.py                # parity and conditional carry diagnostics
+├── treasury.py              # Federal Reserve GSW zero-yield adapter
 ├── option_chain.py          # frozen-chain CLI and per-side IV report
 ├── cli.py                   # command-line adapter
 ├── dashboard.py             # Dash adapter and vectorized sensitivity views
@@ -299,9 +327,9 @@ the reverse.
 
 Black–Scholes–Merton is not an empirical claim that volatility is constant or
 returns are exactly lognormal. It is a transparent baseline and quoting
-framework. The implementation does not currently support American exercise,
-discrete dividends, term structures, early-exercise boundaries, transaction
-costs, jumps, stochastic volatility, or arbitrage-checked volatility surfaces.
+framework. The workflow does not yet support American exercise, transaction
+costs, jumps, stochastic volatility, volatility surfaces, or inverse-payoff
+valuation.
 
 Use of this software is educational; it is not investment advice or a
 production trading system.

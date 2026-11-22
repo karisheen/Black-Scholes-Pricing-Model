@@ -104,26 +104,28 @@ synthetic, free, or licensed data source must satisfy.
 
 11. **Curves, forwards, and market conventions** — Portfolio 5, Quant 5,
     Engineering 4, Effort 4.
-    - [ ] Add zero-rate, discount-factor, forward, and discrete-dividend curves.
-    - [ ] Add trading calendars, day-count rules, valuation timestamps, and
+    - [x] Add zero-rate, discount-factor, forward, and discrete-dividend curves.
+    - [x] Add trading calendars, day-count rules, valuation timestamps, and
       exact expiration times.
-    - [ ] Implement Black-76/forward-based pricing for futures and crypto
-      options while retaining spot Black–Scholes–Merton pricing.
-    - [ ] Report put–call parity, implied-forward, implied-dividend, and
+    - [x] Implement Black-76/forward-based pricing for linear futures and
+      crypto options while retaining spot Black–Scholes–Merton pricing.
+    - [x] Report put–call parity, implied-forward, implied-dividend, and
       implied-borrow diagnostics.
-    - [ ] Add a U.S. Treasury curve adapter while keeping fixed fixtures for
+    - [x] Add a U.S. Treasury zero-yield adapter with frozen fixtures for
       deterministic tests.
 
 12. **Normalized storage, quality controls, and replay boundary** — Portfolio
     5, Quant 4, Engineering 5, Effort 4.
-    - [ ] Store versioned raw and normalized events in partitioned Parquet with
+    - [x] Store versioned raw and normalized events in partitioned Parquet with
       UTC timestamps and source metadata.
-    - [ ] Make ingestion idempotent and detect duplicates, crossed markets,
+    - [x] Make ingestion idempotent and detect duplicates, crossed markets,
       stale quotes, sequence gaps, and invalid prices or sizes.
-    - [ ] Implement `SyntheticProvider` and `ParquetReplayProvider` behind the
+    - [x] Implement `SyntheticProvider` and `ParquetReplayProvider` behind the
       same interface used by live feeds.
-    - [ ] Reconstruct snapshots deterministically and report incomplete data
+    - [x] Reconstruct snapshots deterministically and report incomplete data
       rather than silently filling gaps.
+
+    See [implementation decisions and reproducible workflow](IMPLEMENTATION_SUMMARY.md#p2--market-foundations).
 
 ## P3 — Volatility and portfolio analytics
 

@@ -7,22 +7,26 @@ import json
 import math
 import sys
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
+from hashlib import sha256
 from pathlib import Path
 from typing import Literal, cast
 
 from quant_pricing.black_scholes import OptionType
+from quant_pricing.conventions import year_fraction
 from quant_pricing.exceptions import PricingError
 from quant_pricing.implied_volatility import implied_volatility
 from quant_pricing.market import (
     FrozenQuoteProvider,
     Instrument,
+    MarketSnapshot,
     OptionContract,
     Quote,
     SnapshotQuote,
     Underlying,
 )
+from quant_pricing.parity import CarryAssumptions, diagnose_parity
 
 _SECONDS_PER_YEAR = 365.0 * 24.0 * 60.0 * 60.0
 
@@ -104,8 +108,10 @@ def _json_number(value: float) -> float | str:
 def load_fixture(path: str | Path) -> FrozenChainFixture:
     """Read version-one synthetic JSON; no network, pricing or clock access."""
 
-    raw: object = json.loads(Path(path).read_text(encoding="utf-8"))
-    data = _object(raw, "fixture")
+    return _load_data(_object(json.loads(Path(path).read_bytes()), "fixture"))
+
+
+def _load_data(data: dict[str, object]) -> FrozenChainFixture:
     if _integer(data.get("schema_version"), "schema_version") != 1:
         raise ValueError("only fixture schema_version 1 is supported")
     if data.get("data_kind") != "frozen_synthetic":
@@ -182,24 +188,37 @@ def load_fixture(path: str | Path) -> FrozenChainFixture:
     )
 
 
+def _provenance(quote: Quote) -> dict[str, object]:
+    return {
+        "source": quote.source,
+        "source_sequence": quote.source_sequence,
+        "quote_time": _iso(quote.quote_time),
+        "available_at": _iso(quote.available_at),
+    }
+
+
 def _observation(row: SnapshotQuote, fixture: FrozenChainFixture) -> dict[str, object]:
     quote = row.quote
     instrument = row.instrument
     result: dict[str, object] = {
         "symbol": instrument.symbol,
         "quality_flags": list(row.flags),
+        "sequence_gaps": [
+            {
+                "first_missing": gap.first_missing,
+                "last_missing": gap.last_missing,
+                "before": _provenance(gap.before),
+                "after": _provenance(gap.after),
+            }
+            for gap in row.sequence_gaps
+        ],
         "provenance": None,
         "raw": None,
         "normalized": None,
     }
     if quote is None:
         return result
-    result["provenance"] = {
-        "source": quote.source,
-        "source_sequence": quote.source_sequence,
-        "quote_time": _iso(quote.quote_time),
-        "available_at": _iso(quote.available_at),
-    }
+    result["provenance"] = _provenance(quote)
     if isinstance(instrument, OptionContract):
         currency = instrument.quote_currency
         basis = instrument.premium_basis
@@ -262,15 +281,75 @@ def _solve_side(
     }
 
 
+def _parity_reports(
+    fixture: FrozenChainFixture,
+    as_of: datetime,
+    rows: dict[str, SnapshotQuote],
+    spot: float | None,
+) -> list[dict[str, object]]:
+    pairs: dict[tuple[datetime, float], list[OptionContract]] = {}
+    for spec in fixture.options:
+        contract = spec.contract
+        if (
+            spec.payoff_model == "linear"
+            and spec.strike_currency == fixture.underlying.currency
+            and contract.expiry > as_of
+        ):
+            pairs.setdefault((contract.expiry, contract.strike), []).append(contract)
+    reports: list[dict[str, object]] = []
+    for (expiry, strike), legs in sorted(pairs.items()):
+        if len(legs) != 2 or legs[0].option_type is legs[1].option_type:
+            continue
+        call, put = sorted(legs, key=lambda option: option.option_type.value)
+        pair_report: dict[str, object] = {
+            "strike": strike,
+            "expiry": _iso(expiry),
+            "call": call.symbol,
+            "put": put.symbol,
+        }
+        try:
+            time = year_fraction(as_of, expiry)
+            benchmark = None
+            carry = None
+            if spot is not None:
+                factor = math.exp((fixture.rate - fixture.dividend_yield) * time)
+                benchmark = spot * factor
+                carry = CarryAssumptions(spot, fixture.rate, time, borrow_yield=0.0)
+            result = diagnose_parity(
+                rows[call.symbol],
+                rows[put.symbol],
+                as_of=as_of,
+                max_age=fixture.provider.max_age,
+                discount_factor=math.exp(-fixture.rate * time),
+                forward=benchmark,
+                carry=carry,
+            )
+            pair_report.update(asdict(result), carry_forward_benchmark=benchmark)
+        except (PricingError, OverflowError) as exc:
+            pair_report.update(
+                implied_forward=None,
+                error={"type": type(exc).__name__, "message": str(exc)},
+            )
+        reports.append(pair_report)
+    return reports
+
+
 def chain_report(fixture: FrozenChainFixture, as_of: datetime) -> dict[str, object]:
     """Screen one eligible snapshot and solve each usable option side separately."""
 
-    snapshot = fixture.provider.snapshot(as_of)
+    return _report_snapshot(fixture, fixture.provider.snapshot(as_of))
+
+
+def _report_snapshot(
+    fixture: FrozenChainFixture, snapshot: MarketSnapshot
+) -> dict[str, object]:
     rows = {row.instrument.symbol: row for row in snapshot.rows}
     underlying_row = rows[fixture.underlying.symbol]
     underlying_quote = underlying_row.quote
     spot: float | None = None
-    if underlying_quote is not None and not underlying_row.flags:
+    if underlying_quote is not None and not (
+        underlying_row.flags or underlying_row.sequence_gaps
+    ):
         midpoint = underlying_quote.bid / 2.0 + underlying_quote.ask / 2.0
         if midpoint > 0.0:
             spot = midpoint
@@ -281,8 +360,8 @@ def chain_report(fixture: FrozenChainFixture, as_of: datetime) -> dict[str, obje
         contract = specification.contract
         row = rows[contract.symbol]
         report = _observation(row, fixture)
-        elapsed = (contract.expiry - snapshot.as_of).total_seconds()
-        time_to_expiry = elapsed / _SECONDS_PER_YEAR
+        elapsed_seconds = (contract.expiry - snapshot.as_of).total_seconds()
+        time_to_expiry = elapsed_seconds / _SECONDS_PER_YEAR
         report["contract"] = {
             "underlying": contract.underlying.symbol,
             "option_type": contract.option_type.value,
@@ -299,8 +378,9 @@ def chain_report(fixture: FrozenChainFixture, as_of: datetime) -> dict[str, obje
         }
         report["time_to_expiry"] = time_to_expiry
         failure: dict[str, object] | None = None
-        if row.quote is None or row.flags:
-            failure = _failed_side("SnapshotQualityError", ", ".join(row.flags))
+        if row.quote is None or row.flags or row.sequence_gaps:
+            flags = (*row.flags, "sequence_gap") if row.sequence_gaps else row.flags
+            failure = _failed_side("SnapshotQualityError", ", ".join(flags))
         elif spot is None:
             failure = _failed_side(
                 "UnderlyingUnavailable", "no valid underlying midpoint"
@@ -341,6 +421,7 @@ def chain_report(fixture: FrozenChainFixture, as_of: datetime) -> dict[str, obje
         "schema_version": 1,
         "as_of": _iso(snapshot.as_of),
         "source": snapshot.source,
+        "complete": snapshot.complete,
         "assumptions": {
             "data_kind": "frozen_synthetic",
             "model": "Black-Scholes-Merton",
@@ -361,6 +442,7 @@ def chain_report(fixture: FrozenChainFixture, as_of: datetime) -> dict[str, obje
         },
         "underlying": underlying_report,
         "options": option_reports,
+        "parity": _parity_reports(fixture, snapshot.as_of, rows, spot),
     }
 
 
@@ -370,18 +452,57 @@ def generate_report(path: str | Path, as_of: datetime) -> dict[str, object]:
     return chain_report(load_fixture(path), as_of)
 
 
+def _archive_report(
+    path: Path, archive: Path, as_of: datetime, *, ingest: bool
+) -> dict[str, object]:
+    from quant_pricing.replay import ParquetReplayProvider, RawObservation
+
+    raw = path.read_bytes()
+    data = _object(json.loads(raw), "fixture")
+    fixture = _load_data(data)
+    tape = fixture.provider
+    provider = ParquetReplayProvider(
+        archive, tape.instruments, tape.source, tape.max_age
+    )
+    if ingest:
+        digest = sha256(raw).hexdigest()
+        quote_payloads = _array(data["quotes"], "quotes")
+        provider.ingest(
+            RawObservation(
+                quote,
+                json.dumps(payload, sort_keys=True, separators=(",", ":")).encode(),
+                f"sha256:{digest}#quotes/{index}",
+            )
+            for index, (quote, payload) in enumerate(
+                zip(tape.quotes, quote_payloads, strict=True)
+            )
+        )
+    return _report_snapshot(fixture, provider.snapshot(as_of))
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the frozen synthetic chain workflow without any live data source."""
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("fixture", type=Path)
     parser.add_argument("--as-of", required=True, help="timezone-aware ISO-8601 cutoff")
+    parser.add_argument("--archive", type=Path, help="partitioned Parquet archive")
+    parser.add_argument(
+        "--ingest", action="store_true", help="ingest fixture quotes before replaying"
+    )
     arguments = parser.parse_args(argv)
     try:
         cutoff = _timestamp(arguments.as_of, "as_of")
-        report = generate_report(arguments.fixture, cutoff)
+        if arguments.archive is None:
+            if arguments.ingest:
+                raise ValueError("--ingest requires --archive")
+            report = generate_report(arguments.fixture, cutoff)
+        else:
+            report = _archive_report(
+                arguments.fixture, arguments.archive, cutoff, ingest=arguments.ingest
+            )
         rendered = json.dumps(report, indent=2, sort_keys=True, allow_nan=False)
-    except (OSError, ValueError, PricingError) as exc:
+    except (ImportError, OSError, ValueError, PricingError) as exc:
         print(f"option-chain: {exc}", file=sys.stderr)
         return 2
     print(rendered)

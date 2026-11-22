@@ -34,6 +34,7 @@ dashboard = [
     "dash>=2.17",
     "plotly>=5.22",
 ]
+replay = ["pyarrow>=16"]
 
 [dependency-groups]
 dev = [
@@ -95,4 +96,8 @@ pretty = true
 
 [[tool.mypy.overrides]]
 module = ["plotly", "plotly.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["pyarrow", "pyarrow.*"]
 ignore_missing_imports = true

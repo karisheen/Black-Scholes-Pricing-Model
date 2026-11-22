@@ -1,0 +1,11 @@
+"Frozen column subset retrieved 2026-11-22; not a historical vintage or publication-time record."
+"Source: https://www.federalreserve.gov/data/yield-curve-tables/feds200628.csv"
+"Note: This is not an official Federal Reserve statistical release. Because this is a staff research product and not an official statistical release, it is subject to delay, revision, or methodological changes without advance notice."
+
+Series,Compounding Convention,Mnemonic(s)
+Zero-coupon yield,Continuously Compounded,SVENYXX
+Par yield,Coupon-Equivalent,SVENPYXX
+
+Date,SVENPY01,SVENY01,SVENY02,SVENY07,SVENY08
+1961-06-14,3.0025,2.9825,3.3771,3.7612,NA
+1961-07-04,NA,NA,NA,NA,NA
