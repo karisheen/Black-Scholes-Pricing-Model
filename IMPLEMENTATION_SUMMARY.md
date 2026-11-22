@@ -2,6 +2,9 @@
 
 ## P2 — Market foundations
 
+Published as [`2a2003c`](https://github.com/karisheen/Black-Scholes-Pricing-Model/commit/2a2003cd014064ff2c4fb8bf36a70197a9ab6c9e)
+on `p2-market-foundations`. [GitHub CI passed](https://github.com/karisheen/Black-Scholes-Pricing-Model/actions/runs/45002730430).
+
 Item 10 was already merged in [PR #7](https://github.com/karisheen/Black-Scholes-Pricing-Model/pull/7). P2 builds on its immutable contract, quote, and snapshot types; it does not replace the spot pricer or rewrite the frozen option-chain fixture.
 
 ### Valuation conventions and evidence
@@ -42,3 +45,67 @@ Replay filters both event time and availability time before selecting quotes or 
 - The full suite passed on Python 3.10 and 3.13: 279 tests, 98.45% coverage.
   The frozen curve test uses real `SVENY` observations and missing-value
   examples from the Fed table; tests do not fetch network data.
+
+## P3 — Volatility and portfolio analytics
+
+`p3-volatility-risk` is stacked on `p2-market-foundations`, so the P3 comparison
+can be reviewed against P2 without hiding either phase in one commit.
+
+### Run the offline research workflow
+
+```bash
+uv run python examples/p3_research_workflow.py
+```
+
+The example calibrates three synthetic expiries, then repeats calibration
+with missing, stale, crossed, and noisy input. It values a two-leg portfolio
+from the clean fitted surface, reprices it under joint spot, volatility,
+time, rate, skew, and curvature shocks, and reports a position-limit breach.
+It also reconciles a signed trade and carry cash, then compares American
+and European calls around a scheduled cash dividend. All outputs are
+synthetic or model-implied, not empirical market or execution results.
+
+### Design decisions
+
+- **Surface.** Generate nonflat smiles from an SSVI family with sufficient
+  no-arbitrage conditions, then recover bid, midpoint, and ask IV from
+  observed premium sides using Black-76 and dated curves. Retain input
+  rejections and fit residuals. Calibrate maturity slices with liquidity
+  weights; interpolate total variance on the common observed domain.
+  Arbitrage findings are numerical checks on the declared grid, not a
+  global no-arbitrage guarantee for fitted surfaces.
+- **Risk.** Derivatives hold the model volatility fixed; scenario repricing
+  queries the surface at shocked forward log-moneyness and maturity.
+  Monetary totals are split by currency. For cross-underlying totals,
+  delta and gamma mean `S × delta` and `S² × gamma`, not sums of unlike
+  underlying units. Vega is per absolute volatility unit. Attribution
+  reconciles Taylor terms, model/cash carry, signed trade cash, and a
+  residual; a small residual is not an assumption.
+- **Exercise.** The independent CRR tree escrows scheduled dividends, then
+  checks American exercise both before and after a discrete cash jump.
+  Dividend times must align with the uniform lattice grid; the pricer does
+  not round schedules. Boundaries and assignment exposure are risk-neutral
+  model diagnostics, not empirical assignment forecasts.
+
+### P3 verification
+
+- The research example fitted three expiries and recovered 20.00% at 180-day
+  at-the-money forward moneyness, with no clean-grid arbitrage findings. It
+  rejected the missing, stale, and crossed observations in the damaged tape.
+  Separate tests inject violations large enough to verify raw and fitted
+  arbitrage reporting; the example's mild premium noise need not create one.
+- The USD portfolio's base PV was 912.45 and its joint-stress PV was 714.66.
+  The two-contract position exceeded a 1.5-contract limit. The P&L report
+  reconciled the modeled mark change, trade/fees, and carry cash.
+- For the scheduled-dividend call, American PV was 22.24 per unit versus
+  19.45 European. The model assigned an 87.11% risk-neutral early-exercise
+  probability to the representative policy; it is not a broker forecast.
+- Behavioral coverage includes SVI parameter recovery, delta inversion,
+  calendar/strike/butterfly violations, finite-difference Greeks, currency
+  isolation, scenario shocks, P&L reconciliation, CRR convergence, and
+  American exercise bounds. Ruff, strict mypy, and wheel/source builds are
+  part of the verification gates.
+- Both Python 3.10 and 3.13 passed 477 tests at over 98.9% coverage.
+  The optimizer uses the same public SciPy `least_squares` callable on both;
+  a narrow typed interface handles SciPy 1.15's incorrect export stub without
+  disabling type checking for the module.

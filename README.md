@@ -18,13 +18,15 @@ testing, and measured performance.
 - Immutable market-data contracts and an offline, as-of bid/ask IV example
 - Dated curves, Black-76 pricing and IV, and bid/ask parity diagnostics
 - Optional partitioned Parquet ingestion and causal snapshot replay
+- Liquidity-weighted SVI calibration, bid/mid/ask IV, and surface diagnostics
+- Portfolio Greeks, scenario shocks, P&L attribution, and risk limits
+- Independent binomial reference for European and American exercise with
+  discrete cash dividends
 - Regression, finite-difference, parity, monotonicity, randomized invariant,
   edge-case, and integration tests
 - Ruff formatting/linting, strict mypy checks, locked dependencies, and CI
 
-The deliberate focus is depth, not model count. American exercise, stochastic
-volatility, Monte Carlo, trees, and volatility surfaces are not presented as
-implemented features. See [ROADMAP.md](ROADMAP.md) for remaining work and
+See [ROADMAP.md](ROADMAP.md) for remaining work and
 [IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md) for design decisions and
 reproducible workflows.
 
@@ -260,6 +262,16 @@ The report includes bid/ask-implied forward intervals and carries a separate
 spot-derived forward benchmark. It withholds IV or parity calculations that
 depend on an unavailable, invalid, stale, crossed, or sequence-gapped quote.
 
+### Synthetic surface, portfolio, and exercise workflow
+
+```bash
+uv run python examples/p3_research_workflow.py
+```
+
+Fit a clean and deliberately damaged synthetic chain, reprice a portfolio
+against the fitted surface, and compare European and American exercise with
+a discrete cash dividend. This is a verification workflow, not a backtest.
+
 ## Validation and quality checks
 
 ```bash
@@ -308,6 +320,10 @@ src/quant_pricing/
 ├── replay.py                # synthetic provider and optional Parquet archive
 ├── parity.py                # parity and conditional carry diagnostics
 ├── treasury.py              # Federal Reserve GSW zero-yield adapter
+├── synthetic_chain.py       # deterministic SSVI chains and injected quote faults
+├── surface.py               # IV observations, SVI fits, and arbitrage checks
+├── risk.py                  # portfolio Greeks, scenarios, attribution, and limits
+├── binomial.py              # independent listed-option exercise reference
 ├── option_chain.py          # frozen-chain CLI and per-side IV report
 ├── cli.py                   # command-line adapter
 ├── dashboard.py             # Dash adapter and vectorized sensitivity views
@@ -327,9 +343,10 @@ the reverse.
 
 Black–Scholes–Merton is not an empirical claim that volatility is constant or
 returns are exactly lognormal. It is a transparent baseline and quoting
-framework. The workflow does not yet support American exercise, transaction
-costs, jumps, stochastic volatility, volatility surfaces, or inverse-payoff
-valuation.
+framework. Fitted surfaces are numerically checked on a declared domain;
+the checks are not a global no-arbitrage guarantee. The binomial reference
+uses escrowed, grid-aligned cash dividends. The toolkit does not model inverse
+settlement, stochastic volatility, transaction costs, or execution.
 
 Use of this software is educational; it is not investment advice or a
 production trading system.
