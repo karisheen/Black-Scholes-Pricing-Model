@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
-from typing import Literal
+from typing import Literal, TypedDict
 
 from quant_pricing.exceptions import InputValidationError
 
@@ -19,6 +19,32 @@ _NS = 1_000_000_000
 _NS_PER_MS = 1_000_000
 _EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 _UTC = re.compile(r"(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)(?:\.(\d{1,9}))?Z")
+
+
+class BookEvidence(TypedDict):
+    line: int
+    available_at: str
+    exchange_time: str
+    change_id: int
+
+
+class BookState(TypedDict):
+    flags: list[str]
+    bid: list[str] | None
+    ask: list[str] | None
+    snapshot: BookEvidence | None
+    last_update: BookEvidence | None
+    issue: dict[str, object] | None
+    snapshots_applied: int
+    changes_applied: int
+    changes_ignored: int
+    sequence_gaps: int
+
+
+class BookCheckpoint(TypedDict):
+    as_of: str
+    complete: bool
+    books: dict[str, BookState]
 
 
 def _timestamp(value: str) -> int:
@@ -115,7 +141,7 @@ class _Evidence:
     exchange: int
     change_id: int
 
-    def report(self) -> dict[str, object]:
+    def report(self) -> BookEvidence:
         return {
             "line": self.line,
             "available_at": _iso(self.received),
@@ -191,7 +217,7 @@ class _Book:
         self.last = evidence
         self.exchange_high_water = max(self.exchange_high_water, evidence.exchange)
 
-    def report(self, cutoff: int, max_age: int) -> dict[str, object]:
+    def report(self, cutoff: int, max_age: int) -> BookState:
         flags: list[str] = []
         bid = ask = None
         if self.last is None:
@@ -259,7 +285,7 @@ def replay(
     cutoffs: Sequence[str],
     *,
     max_age_ms: int = 30_000,
-) -> list[dict[str, object]]:
+) -> list[BookCheckpoint]:
     """Project full native snapshots/deltas into deterministic as-of top of book.
 
     Cutoffs are inclusive UTC timestamps, strictly increasing. Do not reorder
@@ -273,11 +299,11 @@ def replay(
         raise InputValidationError("cutoffs must be strictly increasing")
     max_age = _integer(max_age_ms) * _NS_PER_MS
     channels = {f"book.{symbol}.raw": (symbol, _Book()) for symbol in sorted(symbols)}
-    snapshots: list[dict[str, object]] = []
+    snapshots: list[BookCheckpoint] = []
     index = 0
     last_received: int | None = None
 
-    def project(cutoff: int) -> dict[str, object]:
+    def project(cutoff: int) -> BookCheckpoint:
         books = {
             symbol: book.report(cutoff, max_age) for symbol, book in channels.values()
         }

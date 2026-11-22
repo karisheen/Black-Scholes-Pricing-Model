@@ -193,6 +193,9 @@ free archive is not assumed.
       BTC pipeline passes replay and recovery checks.
     - [ ] Compare independent prices, implied volatilities, and Greeks with
       Deribit marks without using exchange analytics as model inputs.
+      The [linear sample report](README.md#btcusdc-chain-and-iv-quality-report)
+      now verifies explicit BTC/USDC units and compares bid/ask IV and parity
+      against same-expiry futures. Venue mark and Greek comparisons remain open.
     - [ ] Document rate limits, authentication boundaries, units, retention,
       and data-use terms.
 
