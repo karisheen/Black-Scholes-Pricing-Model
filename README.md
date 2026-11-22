@@ -15,6 +15,7 @@ testing, and measured performance.
 - Explicit expiry and zero-volatility conventions
 - Stable log-CDF tail evaluation for extreme moneyness
 - Typed command-line and Dash interfaces that delegate to the pricing package
+- Immutable market-data contracts and an offline, as-of bid/ask IV example
 - Regression, finite-difference, parity, monotonicity, randomized invariant,
   edge-case, and integration tests
 - Ruff formatting/linting, strict mypy checks, locked dependencies, and CI
@@ -199,6 +200,44 @@ separate data pipeline.
 The original `bs_call`, `bs_put`, `d1`, and `d2` names remain available through
 `BlackScholesPricingModel.py` for existing notebooks.
 
+### Offline option chain
+
+Run the [frozen synthetic chain](examples/synthetic_option_chain.json) from
+the repository root:
+
+```bash
+uv run python -m quant_pricing.option_chain \
+  examples/synthetic_option_chain.json --as-of 2025-01-01T12:00:00Z
+```
+
+- **12:00:00 UTC:** The clean, synthetic chain recovers the known 19% bid and
+  21% ask IV at each strike.
+- **12:00:30 UTC:** `C100` is crossed; the report shows the raw quote but no IV.
+  `P100` still uses sequence 1 because its revision, stamped 12:00:20, does
+  not arrive until 12:00:45.
+- **12:01:00 UTC:** `P100` uses sequence 2, the now-available revision.
+
+The instrument universe is fixed in the fixture. The JSON report retains
+quote and availability times, source sequence, raw prices and sizes, premium
+basis, and quality flags. Both clocks must be at or before the cutoff.
+Selection is deterministic within the declared source: latest quote time,
+then sequence, then availability time. Freshness is measured from quote time.
+Missing quotes are not filled; bad or stale quotes are not replaced by older
+ones.
+
+Use `quant_pricing.market.SnapshotProvider` at the application boundary;
+`FrozenQuoteProvider` implements it over an immutable quote tape. A snapshot's
+rows distinguish a missing observation from an observed but unusable quote.
+
+The workflow uses the eligible spot midpoint, fixed decimal rate and dividend
+yield, and elapsed UTC seconds on an ACT/365F basis. It solves each side
+separately for single-currency European cash-settled options; forward quotes
+have a domain type but are not used here. Per-contract premiums are divided
+by the multiplier without changing the denomination. Option quote sizes and
+positions are in contracts; underlying and forward sizes are in underlying
+units. Coin premiums can be represented and normalized in the domain model,
+but the IV workflow does not convert currencies or model inverse payoffs.
+
 ## Validation and quality checks
 
 ```bash
@@ -240,6 +279,8 @@ commands.
 src/quant_pricing/
 ├── black_scholes.py         # deterministic pricing, bounds, and Greeks
 ├── implied_volatility.py    # safeguarded scalar root solve
+├── market.py               # instruments, quotes, and as-of snapshot contract
+├── option_chain.py          # frozen-chain CLI and per-side IV report
 ├── cli.py                   # command-line adapter
 ├── dashboard.py             # Dash adapter and vectorized sensitivity views
 ├── exceptions.py            # domain-specific failures

@@ -88,15 +88,19 @@ synthetic, free, or licensed data source must satisfy.
 
 10. **Instrument, quote, and snapshot domain model** — Portfolio 5, Quant 4,
     Engineering 5, Effort 3.
-    - [ ] Model option contracts with underlying, strike, exact expiry,
+    - [x] Model option contracts with underlying, strike, exact expiry,
       exercise style, settlement style, multiplier, and quote/settlement
       currencies.
-    - [ ] Model timestamped underlying, option, and forward quotes with bid/ask
+    - [x] Model timestamped underlying, option, and forward quotes with bid/ask
       prices, sizes, source, and source sequence.
-    - [ ] Define immutable `MarketSnapshot`, `Position`, `Portfolio`, and
+    - [x] Define immutable `MarketSnapshot`, `Position`, `Portfolio`, and
       provider interfaces without vendor-specific fields.
-    - [ ] Normalize units explicitly, including coin-denominated premiums and
-      contract quantities.
+    - [x] Normalize premium basis and signed contract quantities explicitly.
+      Coin-denominated premiums retain their currency; no implicit FX.
+
+    Offline acceptance: the frozen chain recovers bid and ask implied
+    volatility at an explicit as-of time, reports crossed quotes without
+    fallback, and only admits a late revision after it becomes available.
 
 11. **Curves, forwards, and market conventions** — Portfolio 5, Quant 5,
     Engineering 4, Effort 4.
