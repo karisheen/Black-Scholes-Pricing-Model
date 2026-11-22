@@ -1,0 +1,208 @@
+{
+  "schema_version": 1,
+  "data_kind": "frozen_synthetic",
+  "source": "frozen-synthetic-v1",
+  "max_age_seconds": 120,
+  "rate": 0.04,
+  "dividend_yield": 0.015,
+  "generation": {
+    "as_of": "2025-01-01T12:00:00Z",
+    "spot": 100.0,
+    "bid_volatility": 0.19,
+    "ask_volatility": 0.21,
+    "pricer": "quant_pricing.black_scholes.price",
+    "day_count": "ACT/365F elapsed seconds",
+    "note": "Initial premiums use exactly one year to expiry. The crossed C100 event swaps its frozen bid and ask. The late P100 revision uses 19%/21% at its quote_time, twenty seconds later. Sizes are synthetic. No market data or live feed."
+  },
+  "underlying": {
+    "symbol": "SYNTH",
+    "currency": "USD"
+  },
+  "options": [
+    {
+      "symbol": "SYNTH-20260101-C90",
+      "option_type": "call",
+      "strike": 90.0,
+      "strike_currency": "USD",
+      "expiry": "2026-01-01T12:00:00Z",
+      "exercise_style": "european",
+      "settlement_style": "cash",
+      "payoff_model": "linear",
+      "multiplier": 100.0,
+      "quote_currency": "USD",
+      "settlement_currency": "USD",
+      "premium_basis": "per_unit"
+    },
+    {
+      "symbol": "SYNTH-20260101-P90",
+      "option_type": "put",
+      "strike": 90.0,
+      "strike_currency": "USD",
+      "expiry": "2026-01-01T12:00:00Z",
+      "exercise_style": "european",
+      "settlement_style": "cash",
+      "payoff_model": "linear",
+      "multiplier": 100.0,
+      "quote_currency": "USD",
+      "settlement_currency": "USD",
+      "premium_basis": "per_unit"
+    },
+    {
+      "symbol": "SYNTH-20260101-C100",
+      "option_type": "call",
+      "strike": 100.0,
+      "strike_currency": "USD",
+      "expiry": "2026-01-01T12:00:00Z",
+      "exercise_style": "european",
+      "settlement_style": "cash",
+      "payoff_model": "linear",
+      "multiplier": 100.0,
+      "quote_currency": "USD",
+      "settlement_currency": "USD",
+      "premium_basis": "per_unit"
+    },
+    {
+      "symbol": "SYNTH-20260101-P100",
+      "option_type": "put",
+      "strike": 100.0,
+      "strike_currency": "USD",
+      "expiry": "2026-01-01T12:00:00Z",
+      "exercise_style": "european",
+      "settlement_style": "cash",
+      "payoff_model": "linear",
+      "multiplier": 100.0,
+      "quote_currency": "USD",
+      "settlement_currency": "USD",
+      "premium_basis": "per_contract"
+    },
+    {
+      "symbol": "SYNTH-20260101-C110",
+      "option_type": "call",
+      "strike": 110.0,
+      "strike_currency": "USD",
+      "expiry": "2026-01-01T12:00:00Z",
+      "exercise_style": "european",
+      "settlement_style": "cash",
+      "payoff_model": "linear",
+      "multiplier": 100.0,
+      "quote_currency": "USD",
+      "settlement_currency": "USD",
+      "premium_basis": "per_unit"
+    },
+    {
+      "symbol": "SYNTH-20260101-P110",
+      "option_type": "put",
+      "strike": 110.0,
+      "strike_currency": "USD",
+      "expiry": "2026-01-01T12:00:00Z",
+      "exercise_style": "european",
+      "settlement_style": "cash",
+      "payoff_model": "linear",
+      "multiplier": 100.0,
+      "quote_currency": "USD",
+      "settlement_currency": "USD",
+      "premium_basis": "per_unit"
+    }
+  ],
+  "quotes": [
+    {
+      "symbol": "SYNTH",
+      "bid": 99.9,
+      "ask": 100.1,
+      "bid_size": 500.0,
+      "ask_size": 600.0,
+      "quote_time": "2025-01-01T12:00:00Z",
+      "available_at": "2025-01-01T12:00:00Z",
+      "source": "frozen-synthetic-v1",
+      "source_sequence": 1
+    },
+    {
+      "symbol": "SYNTH-20260101-C90",
+      "bid": 14.598669414592337,
+      "ask": 15.19089999047664,
+      "bid_size": 10.0,
+      "ask_size": 12.0,
+      "quote_time": "2025-01-01T12:00:00Z",
+      "available_at": "2025-01-01T12:00:00Z",
+      "source": "frozen-synthetic-v1",
+      "source_sequence": 1
+    },
+    {
+      "symbol": "SYNTH-20260101-P90",
+      "bid": 2.5585249779951322,
+      "ask": 3.150755553879362,
+      "bid_size": 11.0,
+      "ask_size": 13.0,
+      "quote_time": "2025-01-01T12:00:00Z",
+      "available_at": "2025-01-01T12:00:00Z",
+      "source": "frozen-synthetic-v1",
+      "source_sequence": 1
+    },
+    {
+      "symbol": "SYNTH-20260101-C100",
+      "bid": 8.643376711592449,
+      "ask": 9.409718058519866,
+      "bid_size": 12.0,
+      "ask_size": 14.0,
+      "quote_time": "2025-01-01T12:00:00Z",
+      "available_at": "2025-01-01T12:00:00Z",
+      "source": "frozen-synthetic-v1",
+      "source_sequence": 1
+    },
+    {
+      "symbol": "SYNTH-20260101-P100",
+      "bid": 621.1126666518448,
+      "ask": 697.7468013445846,
+      "bid_size": 13.0,
+      "ask_size": 15.0,
+      "quote_time": "2025-01-01T12:00:00Z",
+      "available_at": "2025-01-01T12:00:00Z",
+      "source": "frozen-synthetic-v1",
+      "source_sequence": 1
+    },
+    {
+      "symbol": "SYNTH-20260101-C110",
+      "bid": 4.660855923841323,
+      "ask": 5.4222654693694095,
+      "bid_size": 14.0,
+      "ask_size": 16.0,
+      "quote_time": "2025-01-01T12:00:00Z",
+      "available_at": "2025-01-01T12:00:00Z",
+      "source": "frozen-synthetic-v1",
+      "source_sequence": 1
+    },
+    {
+      "symbol": "SYNTH-20260101-P110",
+      "bid": 11.836500270290598,
+      "ask": 12.597909815818603,
+      "bid_size": 15.0,
+      "ask_size": 17.0,
+      "quote_time": "2025-01-01T12:00:00Z",
+      "available_at": "2025-01-01T12:00:00Z",
+      "source": "frozen-synthetic-v1",
+      "source_sequence": 1
+    },
+    {
+      "symbol": "SYNTH-20260101-C100",
+      "bid": 9.409718058519866,
+      "ask": 8.643376711592449,
+      "bid_size": 9.0,
+      "ask_size": 8.0,
+      "quote_time": "2025-01-01T12:00:20Z",
+      "available_at": "2025-01-01T12:00:20Z",
+      "source": "frozen-synthetic-v1",
+      "source_sequence": 2
+    },
+    {
+      "symbol": "SYNTH-20260101-P100",
+      "bid": 621.1125157258548,
+      "ask": 697.746628078451,
+      "bid_size": 18.0,
+      "ask_size": 20.0,
+      "quote_time": "2025-01-01T12:00:20Z",
+      "available_at": "2025-01-01T12:00:45Z",
+      "source": "frozen-synthetic-v1",
+      "source_sequence": 2
+    }
+  ]
+}
