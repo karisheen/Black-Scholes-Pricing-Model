@@ -179,3 +179,51 @@ def test_malformed_fixture_cannot_emit_pricing_evidence(
     output = capsys.readouterr()
     assert not output.out
     assert diagnostic in output.err
+
+
+def test_parquet_replay_matches_frozen_chain_and_parity(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    archive = tmp_path / "archive"
+    args = [str(FIXTURE), "--as-of", "2025-01-01T12:00:00Z"]
+    assert main([*args, "--archive", str(archive), "--ingest"]) == 0
+    first = capsys.readouterr().out
+    assert main([*args, "--archive", str(archive)]) == 0
+    assert capsys.readouterr().out == first
+    report = json.loads(first)
+    assert report == json.loads(json.dumps(_report(CLEAN)))
+    assert report["complete"]
+    assert len(report["parity"]) == 3
+    for pair in report["parity"]:
+        low, high = pair["implied_forward"]
+        assert low <= pair["carry_forward_benchmark"] <= high
+
+
+def test_only_eligible_sequence_gaps_suppress_iv_and_parity(tmp_path: Path) -> None:
+    data = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    late = next(
+        quote
+        for quote in data["quotes"]
+        if quote["symbol"] == LATE and quote["source_sequence"] == 2
+    )
+    late["source_sequence"] = 3
+    path = tmp_path / "gap.json"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    before = _report(CLEAN.replace(second=30), path)
+    assert _options(before)[LATE]["sequence_gaps"] == []
+    assert _options(before)[LATE]["bid"]["iv"] is not None
+
+    after = _report(CLEAN.replace(minute=1), path)
+    assert not after["complete"]
+    put = _options(after)[LATE]
+    assert put["sequence_gaps"][0]["first_missing"] == 2
+    assert put["bid"]["iv"] is None
+    pair = next(r for r in after["parity"] if r["put"] == LATE)
+    assert pair["implied_forward"] is None
+    assert "put:sequence_gap" in pair["option_flags"]
+
+
+def test_ingest_requires_explicit_archive(capsys: pytest.CaptureFixture[str]) -> None:
+    args = [str(FIXTURE), "--as-of", "2025-01-01T12:00:00Z", "--ingest"]
+    assert main(args) == 2
+    assert "--ingest requires --archive" in capsys.readouterr().err

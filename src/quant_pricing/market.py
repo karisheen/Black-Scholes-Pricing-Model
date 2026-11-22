@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from itertools import pairwise
 from math import isfinite
 from numbers import Real
 from typing import Literal, Protocol, TypeAlias
@@ -134,15 +135,31 @@ class Quote:
 
 
 @dataclass(frozen=True, slots=True)
+class SequenceGap:
+    """Inclusive missing interval bounded by two eligible observed events.
+
+    Sequences are assumed contiguous per source and instrument, without resets.
+    No expected initial sequence or unseen trailing interval is inferred.
+    """
+
+    first_missing: int
+    last_missing: int
+    before: Quote
+    after: Quote
+
+
+@dataclass(frozen=True, slots=True)
 class SnapshotQuote:
     """A selected raw quote and its exclusion flags; empty flags mean usable."""
 
     instrument: Instrument
     quote: Quote | None
     flags: tuple[QuoteFlag, ...]
+    sequence_gaps: tuple[SequenceGap, ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "flags", tuple(self.flags))
+        object.__setattr__(self, "sequence_gaps", tuple(self.sequence_gaps))
         if self.quote is None:
             if self.flags != ("missing",):
                 raise InputValidationError(
@@ -181,6 +198,11 @@ class MarketSnapshot:
                     or row.quote.available_at > self.as_of
                 ):
                     raise InputValidationError("snapshot cannot contain future quotes")
+
+    @property
+    def complete(self) -> bool:
+        """Whether every declared instrument is usable and has no observed gap."""
+        return all(not row.flags and not row.sequence_gaps for row in self.rows)
 
 
 class SnapshotProvider(Protocol):
@@ -262,6 +284,7 @@ class FrozenQuoteProvider:
         as_of = _utc(as_of, "as_of")
         selected: dict[str, Quote] = {}
         seen: dict[tuple[str, datetime, int, datetime], Quote] = {}
+        observed: dict[str, dict[int, Quote]] = {}
         for quote in self.quotes:
             if (
                 quote.source != self.source
@@ -279,6 +302,13 @@ class FrozenQuoteProvider:
                     )
                 continue
             seen[key] = quote
+            per_sequence = observed.setdefault(quote.instrument.symbol, {})
+            previous_sequence = per_sequence.get(quote.source_sequence)
+            if previous_sequence is None or (
+                quote.quote_time,
+                quote.available_at,
+            ) < (previous_sequence.quote_time, previous_sequence.available_at):
+                per_sequence[quote.source_sequence] = quote
             previous = selected.get(quote.instrument.symbol)
             if previous is None or rank > (
                 previous.quote_time,
@@ -294,7 +324,21 @@ class FrozenQuoteProvider:
                 if chosen is None
                 else _quote_flags(chosen, as_of, self.max_age)
             )
-            rows.append(SnapshotQuote(instrument, chosen, flags))
+            sequences = sorted(
+                observed.get(instrument.symbol, {}).values(),
+                key=lambda quote: quote.source_sequence,
+            )
+            gaps = tuple(
+                SequenceGap(
+                    before.source_sequence + 1,
+                    after.source_sequence - 1,
+                    before,
+                    after,
+                )
+                for before, after in pairwise(sequences)
+                if after.source_sequence > before.source_sequence + 1
+            )
+            rows.append(SnapshotQuote(instrument, chosen, flags, gaps))
         return MarketSnapshot(as_of, self.source, tuple(rows))
 
 

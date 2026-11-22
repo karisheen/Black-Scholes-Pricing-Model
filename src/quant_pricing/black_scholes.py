@@ -182,13 +182,18 @@ def _total_volatility(inputs: _Inputs) -> FloatArray:
 
 
 def _standardized_terms(inputs: _Inputs) -> tuple[FloatArray, FloatArray]:
-    sigma_root_time = _total_volatility(inputs)
-    log_forward_moneyness = (
+    return _standardized_log_terms(
         np.log(inputs.spot)
         - np.log(inputs.strike)
         + inputs.rate * inputs.time_to_expiry
-        - inputs.dividend_yield * inputs.time_to_expiry
+        - inputs.dividend_yield * inputs.time_to_expiry,
+        _total_volatility(inputs),
     )
+
+
+def _standardized_log_terms(
+    log_forward_moneyness: FloatArray, sigma_root_time: FloatArray
+) -> tuple[FloatArray, FloatArray]:
     with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
         scaled_moneyness = log_forward_moneyness / sigma_root_time
     zero_scale_limit = np.where(
@@ -203,6 +208,32 @@ def _standardized_terms(inputs: _Inputs) -> tuple[FloatArray, FloatArray]:
         d1_value = scaled_moneyness + 0.5 * sigma_root_time
         d2_value = scaled_moneyness - 0.5 * sigma_root_time
     return d1_value, d2_value
+
+
+def _lognormal_price(
+    kind: OptionType,
+    log_asset: FloatArray,
+    log_strike: FloatArray,
+    log_moneyness: FloatArray,
+    total_volatility: FloatArray,
+) -> FloatArray:
+    """Shared discounted-log-asset kernel for spot and forward Black models."""
+    if kind is OptionType.CALL:
+        deterministic = _positive_difference(log_asset, log_strike)
+    else:
+        deterministic = _positive_difference(log_strike, log_asset)
+    regular = total_volatility > 0.0
+    if not np.any(regular):
+        return deterministic
+    first, second = _standardized_log_terms(log_moneyness, total_volatility)
+    if kind is OptionType.CALL:
+        log_first = log_asset + log_ndtr(first)
+        log_second = log_strike + log_ndtr(second)
+    else:
+        log_first = log_strike + log_ndtr(-second)
+        log_second = log_asset + log_ndtr(-first)
+    stochastic = _positive_difference(log_first, log_second)
+    return np.where(regular, stochastic, deterministic)
 
 
 def d1_d2(
@@ -279,25 +310,19 @@ def price(
     log_spot, log_strike = _log_discounted_assets(inputs)
 
     if kind is OptionType.CALL:
-        deterministic = _positive_difference(log_spot, log_strike)
         expiry_payoff = np.maximum(inputs.spot - inputs.strike, 0.0)
     else:
-        deterministic = _positive_difference(log_strike, log_spot)
         expiry_payoff = np.maximum(inputs.strike - inputs.spot, 0.0)
-
-    regular = (inputs.time_to_expiry > 0.0) & (_total_volatility(inputs) > 0.0)
-    if np.any(regular):
-        first, second = _standardized_terms(inputs)
-        if kind is OptionType.CALL:
-            log_first = log_spot + log_ndtr(first)
-            log_second = log_strike + log_ndtr(second)
-        else:
-            log_first = log_strike + log_ndtr(-second)
-            log_second = log_spot + log_ndtr(-first)
-        stochastic = _positive_difference(log_first, log_second)
-        result = np.where(regular, stochastic, deterministic)
-    else:
-        result = deterministic
+    result = _lognormal_price(
+        kind,
+        log_spot,
+        log_strike,
+        np.log(inputs.spot)
+        - np.log(inputs.strike)
+        + inputs.rate * inputs.time_to_expiry
+        - inputs.dividend_yield * inputs.time_to_expiry,
+        _total_volatility(inputs),
+    )
 
     result = np.where(inputs.time_to_expiry == 0.0, expiry_payoff, result)
     return _to_public(np.maximum(result, 0.0))
