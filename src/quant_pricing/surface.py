@@ -88,6 +88,14 @@ class IVObservation:
     log_moneyness: float | None = None
     weight: float = 0.0
 
+    @property
+    def fit_eligible(self) -> bool:
+        """A liquid, positive midpoint IV can enter the SVI objective."""
+        if self.rejected or self.weight <= 0.0:
+            return False
+        volatility = self.sides[1].volatility
+        return volatility is not None and volatility > 0.0
+
 
 @dataclass(frozen=True, slots=True)
 class FitResidual:
@@ -500,6 +508,35 @@ def _fit_slice(
     )
 
 
+def fit_svi_slice(
+    expiry: datetime, observations: tuple[IVObservation, ...]
+) -> SVISlice:
+    """Fit one expiry from recovered IV, with the standard SVI objective."""
+    if any(
+        not isinstance(obs.row.instrument, OptionContract)
+        or obs.row.instrument.expiry != expiry
+        for obs in observations
+    ):
+        raise InputValidationError("SVI observations must share the requested expiry")
+    return _fit_slice(expiry, [obs for obs in observations if obs.fit_eligible], 3000)
+
+
+def check_fitted_surface(
+    surface: VolatilitySurface, *, check_points: int = 101, tolerance: float = 1e-8
+) -> ArbitrageReport:
+    """Check the common strike grid at expiry knots and maturity midpoints."""
+    times = tuple(s.time_to_expiry for s in surface.slices)
+    check_times = tuple(
+        sorted((*times, *((a + b) / 2 for a, b in itertools.pairwise(times))))
+    )
+    return check_arbitrage(
+        surface,
+        tuple(float(k) for k in np.linspace(*surface.domain, check_points)),
+        check_times,
+        tolerance=tolerance,
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class SurfaceCalibration:
     surface: VolatilitySurface
@@ -554,25 +591,16 @@ def calibrate_surface(
             and contract.exercise_style == "european"
         ):
             group = groups.setdefault(contract.expiry, [])
-            if not obs.rejected and obs.weight > 0:
-                vol = obs.sides[1].volatility
-                if vol is not None and vol > 0:
-                    group.append(obs)
+            if obs.fit_eligible:
+                group.append(obs)
     surface = VolatilitySurface(
         tuple(
             _fit_slice(expiry, group, max_evaluations)
             for expiry, group in sorted(groups.items())
         )
     )
-    times = tuple(s.time_to_expiry for s in surface.slices)
-    check_times = tuple(
-        sorted((*times, *((a + b) / 2 for a, b in itertools.pairwise(times))))
-    )
-    report = check_arbitrage(
-        surface,
-        tuple(float(k) for k in np.linspace(*surface.domain, check_points)),
-        check_times,
-        tolerance=arbitrage_tolerance,
+    report = check_fitted_surface(
+        surface, check_points=check_points, tolerance=arbitrage_tolerance
     )
     observed = check_observed_arbitrage(observations, tolerance=arbitrage_tolerance)
     return SurfaceCalibration(surface, observations, report, observed)

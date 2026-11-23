@@ -262,6 +262,166 @@ The report includes bid/ask-implied forward intervals and carries a separate
 spot-derived forward benchmark. It withholds IV or parity calculations that
 depend on an unavailable, invalid, stale, crossed, or sequence-gapped quote.
 
+### Historical Deribit order-book replay
+
+Download a two-minute [free Tardis sample](https://docs.tardis.dev/historical-data-details/deribit)
+to a private directory outside the repository. This reads a historical feed,
+not the live Deribit API. No credential is needed for this first-of-month sample.
+
+```bash
+capture=$(mktemp "${TMPDIR:-/tmp}/tardis-deribit.XXXXXX")
+curl -fsS --compressed --get 'https://api.tardis.dev/v1/data-feeds/deribit' \
+  --data-urlencode 'from=2024-01-01' \
+  --data-urlencode 'sliceSize=2' \
+  --data-urlencode 'filters=[{"channel":"book","symbols":["BTC-29MAR24-45000-C","BTC-29MAR24-45000-P","BTC-29MAR24-46000-C"]}]' \
+  --output "$capture" &&
+uv run python -m quant_pricing.tardis_deribit "$capture" \
+  --symbol BTC-29MAR24-45000-C \
+  --symbol BTC-29MAR24-45000-P \
+  --symbol BTC-29MAR24-46000-C \
+  --as-of 2024-01-01T00:00:20Z \
+  --as-of 2024-01-01T00:00:30.4Z \
+  --as-of 2024-01-01T00:00:31Z
+```
+
+The report shows a usable three-book snapshot, a disconnect with quotes
+withheld, and fresh snapshots on recovery. Repeat the command on the same
+bytes to reproduce the result. `--as-of` cutoffs are inclusive, strictly
+increasing UTC times; queries after the last dated frame fail.
+
+Removing one update from this sample also produced a gap for only the affected
+instrument. Its next full snapshot restored a usable book.
+
+- Use contiguous **raw** Tardis capture slices, not CSV, grouped books, or
+  concatenated noncontiguous downloads. Replay follows capture receipt order,
+  retaining fractional timestamp precision and file order for ties. It also
+  reports venue time and withholds state if any applied dependency is dated
+  after the cutoff. Tardis receipt time represents the vendor's observation
+  clock, not when this project downloaded the file.
+- A change must link to the last accepted venue ID; the ID need not increment
+  by one. A broken link invalidates only that instrument. An untimestamped
+  Tardis disconnect marker conservatively invalidates all requested books just
+  after the preceding receipt (or in file order for equal receipt times).
+  The marker does **not** identify the precise outage time. Recovery requires a
+  new snapshot for each affected instrument.
+- Prices and amounts are native decimal strings. Stale, crossed, and
+  one-sided books are flagged, not counted as complete. This sample is for
+  book reconstruction only: it is not a normalized `MarketSnapshot`, a
+  linear Black–76 input, or execution evidence.
+- Keep the capture and event-level output private under the
+  [Tardis licence](https://docs.tardis.dev/legal/terms-of-service#9-licence).
+  Tests use synthetic frames, not redistributed market data.
+
+### BTC/USDC chain and IV quality report
+
+Run this Bash example from the repository root. It requests two minutes of
+free Tardis history for two dated futures and 40 linear BTC/USDC options.
+The download and report stay in a private directory outside the repository.
+
+```bash
+work=$(mktemp -d "${TMPDIR:-/tmp}/btc-usdc-chain.XXXXXX")
+strikes=(76000 78000 80000 82000 84000 85000 86000 88000 90000 92000)
+filter=$(python3 -c '
+import json, sys
+symbols = []
+for expiry in ("30OCT26", "27NOV26"):
+    future = f"BTC_USDC-{expiry}"
+    symbols.append(future)
+    symbols.extend(f"{future}-{k}-{s}" for k in sys.argv[1:] for s in "CP")
+print(json.dumps([{"channel": "book", "symbols": symbols}]))
+' "${strikes[@]}")
+strike_args=()
+for strike in "${strikes[@]}"; do strike_args+=(--strike "$strike"); done
+curl -fsS --compressed --get 'https://api.tardis.dev/v1/data-feeds/deribit' \
+  --data-urlencode 'from=2026-10-01' --data-urlencode 'sliceSize=2' \
+  --data-urlencode "filters=$filter" --output "$work/capture.ndjson" &&
+uv run python -m quant_pricing.deribit_chain "$work/capture.ndjson" \
+  --expiry 30OCT26 --expiry 27NOV26 "${strike_args[@]}" --rate 0 \
+  --as-of 2026-10-01T00:00:20Z --as-of 2026-10-01T00:00:45Z \
+  --as-of 2026-10-01T00:01:30Z > "$work/iv-quality.json" &&
+jq '.checkpoints[] | {as_of, expiries: [.expiries[] | {expiry, coverage, fit_error}]}' \
+  "$work/iv-quality.json"
+```
+
+- **Units:** For [Deribit linear BTC/USDC options](https://support.deribit.com/hc/en-us/articles/31424932728093-Linear-USDC-Options),
+  one option contract represents one BTC. Prices are USDC per BTC. Convert
+  native BTC amounts to option contract counts; dated-future sizes remain BTC.
+  The adapter is scoped to this product family, not inverse or USD contracts.
+- **Inputs:** Use the as-of midpoint of a fresh two-sided book for the exact
+  matching dated future as a forward proxy. `--rate 0` gives discount factor
+  one, matching the venue's documented formula; it is not a USDC funding
+  estimate. Do not use a venue mark or parity-derived forward as a fallback.
+  Do not price during or after the 30-minute settlement window.
+- **Quality:** Retain the native book, normalized units and both clocks.
+  Reject unsafe books, and report bid, premium-midpoint, and ask IV errors
+  separately. Show book age, spread, parity-implied intervals versus the
+  observed futures spread, and fit failures per expiry. A failed fit does not
+  erase valid IV or a fit for another expiry.
+- **Fit:** Use one positive liquid OTM midpoint IV per strike. Report SVI
+  residuals and check raw midpoint and fitted-grid violations separately.
+  Midpoint findings are not executable-arbitrage claims; a clean fitted grid
+  is not a global proof.
+
+In the sample, all 40 contracts had two-sided IV at the first cutoff. Eight
+books later failed the 30-second freshness gate, but both expiry fits still
+had ten eligible OTM strikes. This is one short session, not a liquidity or
+execution backtest. Real samples and full reports are not in version control.
+
+#### Freeze strikes from the Tardis catalog
+
+Instead of a fixed grid, choose strikes from a complete [Tardis `/symbols` response](https://docs.tardis.dev/api/http-api-reference#symbols)
+queried for the **previous UTC day**, with the replay day as the exclusive
+end. The selector also rejects contracts first seen on or after the replay
+day, because archive availability is day-granular. This is an archive-based
+universe, not an official historical exchange listing feed.
+
+```bash
+work=$(mktemp -d "${TMPDIR:-/tmp}/btc-usdc-catalog.XXXXXX")
+curl -fsSG --compressed 'https://api.tardis.dev/v1/symbols' \
+  --data-urlencode 'exchanges=deribit' --data-urlencode 'baseCurrency=BTC' \
+  --data-urlencode 'quoteCurrency=USDC' --data-urlencode 'type=option' \
+  --data-urlencode 'availableSince=2026-07-31' \
+  --data-urlencode 'availableTo=2026-08-01' --data-urlencode 'limit=1000' \
+  --output "$work/catalog.json"
+
+tardis_book() {
+  curl -fsSG --compressed 'https://api.tardis.dev/v1/data-feeds/deribit' \
+    --data-urlencode 'from=2026-08-01' --data-urlencode "sliceSize=$1" \
+    --data-urlencode "filters=$2" --output "$3"
+}
+tardis_book 1 '[{"channel":"book","symbols":["BTC_USDC-28AUG26","BTC_USDC-25SEP26"]}]' \
+  "$work/futures.ndjson" &&
+uv run python -m quant_pricing.deribit_chain "$work/futures.ndjson" \
+  --catalog "$work/catalog.json" --expiry 28AUG26 --expiry 25SEP26 \
+  --as-of 2026-08-01T00:00:10Z > "$work/selection.json" &&
+tardis_book 2 "$(jq -c .tardis_filter "$work/selection.json")" "$work/books.ndjson" &&
+uv run python -m quant_pricing.deribit_chain "$work/books.ndjson" \
+  --selection "$work/selection.json" --rate 0 \
+  --as-of 2026-08-01T00:00:20Z --as-of 2026-08-01T00:01:30Z > "$work/report.json"
+```
+
+The planner freezes up to nine paired call/put strikes by absolute log
+moneyness to each expiry's own dated future, before inspecting option books.
+It records the catalog checksum and the futures observations used to select
+strikes. The report validates those anchors against the full tape, refuses
+earlier cutoffs, and keeps missing strikes instead of replacing them. A
+paginated catalog must first be combined into a complete local response.
+
+Each expiry now has a separate `quoted_butterflies` report. It checks
+adjacent selected strike triplets using asks for bought wings and bids for
+the sold center, including unequal strike spacing. The check considers
+call/put substitutions and crosses the dated futures spread for the net
+hedge. It reports the lowest entry cost, constituent legs, and an indicative
+size cap. A negative cost is a **candidate before fees**, not a simultaneous
+fill or tradable lot guarantee. Missing or unusable legs reduce coverage;
+the scan does not bridge gaps or replace midpoint diagnostics.
+
+Across the four Aug-Nov first-of-month sample days, this rule recovered
+both expiry fits at all three checkpoints per day. The fixed grid previously
+missed the August back expiry. The new scan checked 168 triplet observations
+with no negative quoted entry cost, despite 53 midpoint findings. These are
+repeated checks on short recorded sessions, not independent trading trials.
+
 ### Synthetic surface, portfolio, and exercise workflow
 
 ```bash
@@ -318,6 +478,10 @@ src/quant_pricing/
 ├── implied_volatility.py    # safeguarded scalar root solve
 ├── market.py               # instruments, quotes, and as-of snapshot contract
 ├── replay.py                # synthetic provider and optional Parquet archive
+├── tardis_deribit.py        # native historical book reconstruction and CLI
+├── deribit_chain.py         # historical linear BTC/USDC IV quality report
+├── deribit_catalog.py       # deterministic prior-day strike selection
+├── butterfly.py             # spread-aware weighted butterfly diagnostics
 ├── parity.py                # parity and conditional carry diagnostics
 ├── treasury.py              # Federal Reserve GSW zero-yield adapter
 ├── synthetic_chain.py       # deterministic SSVI chains and injected quote faults

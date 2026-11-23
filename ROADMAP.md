@@ -182,14 +182,24 @@ free archive is not assumed.
     Engineering 5, Effort 4.
     - [ ] Discover BTC option instruments and track listing, state, and expiry
       changes without repeatedly polling the full catalog.
+      Prior-day Tardis catalog selection freezes the historical option strip
+      before observing quotes; live listing lifecycle tracking remains open.
     - [ ] Ingest index and forward prices, chain summaries, bid/ask quotes,
       grouped order books, trades, open interest, and settlement prices.
     - [ ] Maintain books from snapshots and incremental updates with sequence
       and reconnect-gap validation.
+      The [historical Tardis replay workflow](README.md#historical-deribit-order-book-replay)
+      verifies book reconstruction and recovery offline. Live collection,
+      normalized archival, and venue-specific data rights are still open.
     - [ ] Persist raw and normalized events continuously, then add ETH after the
       BTC pipeline passes replay and recovery checks.
     - [ ] Compare independent prices, implied volatilities, and Greeks with
       Deribit marks without using exchange analytics as model inputs.
+      The [linear sample report](README.md#btcusdc-chain-and-iv-quality-report)
+      now verifies explicit BTC/USDC units and compares bid/ask IV and parity
+      against same-expiry futures. Venue mark and Greek comparisons remain open.
+      A separate quoted butterfly scan tests selected triplets against
+      displayed option and futures spreads, without inferring fills.
     - [ ] Document rate limits, authentication boundaries, units, retention,
       and data-use terms.
 
