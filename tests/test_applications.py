@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 from dash import html
 
+import quant_pricing.dashboard as dashboard_module
 from quant_pricing import price
 from quant_pricing.cli import main as cli_main
 from quant_pricing.dashboard import (
@@ -18,6 +19,7 @@ from quant_pricing.dashboard import (
     render_analysis,
     theme_class_name,
 )
+from quant_pricing.lab_data import ReportLibrary
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -175,6 +177,13 @@ def test_theme_switch_preserves_last_calculated_scenario_with_pending_edits() ->
     values["theme-mode.value"] = "dark"
     themed = update("results.children", "theme-mode.value")
     assert themed["props"]["children"][0]["props"]["children"] == "Call value: $10.4506"
+    themed_graph = themed["props"]["children"][2]["props"]["children"][0]
+    assert themed_graph["props"]["figure"]["layout"]["paper_bgcolor"] == "#48483a"
+    values["theme-mode.value"] = "light"
+    light = update("results.children", "theme-mode.value")
+    assert light["props"]["children"][0]["props"]["children"] == "Call value: $10.4506"
+    light_graph = light["props"]["children"][2]["props"]["children"][0]
+    assert light_graph["props"]["figure"]["layout"]["paper_bgcolor"] == "#f2f0e5"
 
     values["calculate.n_clicks"] = 2
     values["submitted-scenario.data"] = update(
@@ -191,14 +200,171 @@ def test_dash_app_and_compatibility_entry_point_initialize() -> None:
     app = create_app()
     compatibility = runpy.run_path(str(ROOT / "dashboard.py"))
 
-    assert app.title == "Black-Scholes-Merton Analytics"
+    assert app.title == "Options Lab"
     assert app.layout is not None
-    assert app.layout.className == "dashboard-shell theme-light"
+    assert app.layout.className == "dashboard-shell theme-dark"
     assert theme_class_name("dark") == "dashboard-shell theme-dark"
-    assert theme_class_name("unsupported") == "dashboard-shell theme-light"
+    assert theme_class_name("unsupported") == "dashboard-shell theme-dark"
+    assert theme_class_name(None) == "dashboard-shell theme-dark"
+    assert theme_class_name("light") == "dashboard-shell theme-light"
     assert (Path(app.config.assets_folder) / "dashboard.css").is_file()
     stylesheet = app.server.test_client().get("/assets/dashboard.css")
     assert stylesheet.status_code == 200
     assert b".dashboard-shell.theme-dark" in stylesheet.data
     assert compatibility["app"].title == app.title
     assert compatibility["server"] is compatibility["app"].server
+
+
+def _layout_props(node: Any) -> dict[str, dict[str, Any]]:
+    """Index serialized layout components without depending on nesting."""
+    result: dict[str, dict[str, Any]] = {}
+    if isinstance(node, list):
+        for child in node:
+            result.update(_layout_props(child))
+    elif isinstance(node, dict) and "props" in node:
+        props = node["props"]
+        identifier = props.get("id")
+        if isinstance(identifier, str):
+            result[identifier] = props
+        result.update(_layout_props(props.get("children")))
+    return result
+
+
+def test_replay_default_mounts_both_views_and_persists_only_theme() -> None:
+    client = create_app().server.test_client()
+    response = client.get("/_dash-layout")
+    assert response.status_code == 200
+    props = _layout_props(response.get_json())
+    assert props["lab-navigation"]["value"] == "replay"
+    assert props["lab-replay-view"]["hidden"] is False
+    assert props["lab-calculator-view"]["hidden"] is True
+    assert props["theme-mode"]["value"] == "dark"
+    assert props["theme-mode"]["persistence"] is True
+    assert props["theme-mode"]["persistence_type"] == "local"
+    assert props["spot"]["value"] == 100.0
+    assert props["premium-field"]["hidden"] is True
+    assert "lab-session" in props
+    assert "lab-smile" in props
+
+
+@pytest.mark.parametrize(
+    ("view", "replay_hidden", "calculator_hidden"),
+    [("calculator", True, False), ("replay", False, True), ("unknown", False, True)],
+)
+def test_navigation_only_changes_visibility_not_calculator_state(
+    view: str, replay_hidden: bool, calculator_hidden: bool
+) -> None:
+    client = create_app().server.test_client()
+    callbacks = client.get("/_dash-dependencies").get_json()
+    callback = next(
+        item for item in callbacks if "lab-replay-view.hidden" in item["output"]
+    )
+    assert callback["inputs"] == [{"id": "lab-navigation", "property": "value"}]
+    assert callback["state"] == []
+    response = client.post(
+        "/_dash-update-component",
+        json={
+            "output": callback["output"],
+            "outputs": [
+                {"id": "lab-replay-view", "property": "hidden"},
+                {"id": "lab-calculator-view", "property": "hidden"},
+            ],
+            "inputs": [{"id": "lab-navigation", "property": "value", "value": view}],
+            "state": [],
+            "changedPropIds": ["lab-navigation.value"],
+        },
+    )
+    assert response.status_code == 200
+    assert response.get_json()["response"] == {
+        "lab-replay-view": {"hidden": replay_hidden},
+        "lab-calculator-view": {"hidden": calculator_hidden},
+    }
+
+
+@pytest.mark.parametrize(
+    ("mode", "hidden"), [("price", (False, True)), ("iv", (True, False))]
+)
+def test_calculator_mode_toggles_fields_without_resetting_values(
+    mode: str, hidden: tuple[bool, bool]
+) -> None:
+    client = create_app().server.test_client()
+    callback = next(
+        item
+        for item in client.get("/_dash-dependencies").get_json()
+        if "volatility-field.hidden" in item["output"]
+    )
+    response = client.post(
+        "/_dash-update-component",
+        json={
+            "output": callback["output"],
+            "outputs": [
+                {"id": "volatility-field", "property": "hidden"},
+                {"id": "premium-field", "property": "hidden"},
+            ],
+            "inputs": [{"id": "pricing-mode", "property": "value", "value": mode}],
+            "state": [],
+            "changedPropIds": ["pricing-mode.value"],
+        },
+    )
+    assert response.status_code == 200
+    assert response.get_json()["response"] == {
+        "volatility-field": {"hidden": hidden[0]},
+        "premium-field": {"hidden": hidden[1]},
+    }
+
+
+def test_theme_before_first_submission_does_not_create_a_calculation() -> None:
+    client = create_app().server.test_client()
+    response = client.post(
+        "/_dash-update-component",
+        json={
+            "output": "results.children",
+            "outputs": {"id": "results", "property": "children"},
+            "inputs": [
+                {"id": "submitted-scenario", "property": "data", "value": None},
+                {"id": "theme-mode", "property": "value", "value": "dark"},
+            ],
+            "state": [],
+            "changedPropIds": ["theme-mode.value"],
+        },
+    )
+    assert response.status_code == 204
+
+
+@pytest.mark.parametrize("explicit", [True, False])
+def test_report_directory_uses_explicit_argument_before_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, explicit: bool
+) -> None:
+    environment_dir = tmp_path / "environment"
+    explicit_dir = tmp_path / "explicit"
+    monkeypatch.setenv("OPTIONS_LAB_REPORTS", str(environment_dir))
+    library = dashboard_module.load_reports(tmp_path)
+    loaded: list[str | Path | None] = []
+
+    def capture(directory: str | Path | None = None) -> ReportLibrary:
+        loaded.append(directory)
+        return library
+
+    monkeypatch.setattr(dashboard_module, "load_reports", capture)
+    app = create_app(report_dir=explicit_dir) if explicit else create_app()
+    assert loaded == [explicit_dir if explicit else str(environment_dir)]
+    assert app.server.test_client().get("/_dash-layout").status_code == 200
+
+
+@pytest.mark.parametrize("theme", ["dark", "light", None])
+def test_shared_theme_callback_updates_shell(theme: str | None) -> None:
+    client = create_app().server.test_client()
+    response = client.post(
+        "/_dash-update-component",
+        json={
+            "output": "app-shell.className",
+            "outputs": {"id": "app-shell", "property": "className"},
+            "inputs": [{"id": "theme-mode", "property": "value", "value": theme}],
+            "state": [],
+            "changedPropIds": ["theme-mode.value"],
+        },
+    )
+    assert response.status_code == 200
+    assert response.get_json()["response"]["app-shell"][
+        "className"
+    ] == theme_class_name(theme)

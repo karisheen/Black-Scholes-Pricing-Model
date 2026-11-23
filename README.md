@@ -185,25 +185,129 @@ uv run black-scholes \
   --rate 0.05 --volatility 0.20 --type call
 ```
 
-Run the local dashboard:
+### Options Lab dashboard
+
+Options Lab is a local, read-only replay workspace for historical linear
+BTC/USDC options and their same-expiry futures. Start with the deterministic,
+clearly labeled **public synthetic demo** (no private reports required):
 
 ```bash
-uv run black-scholes-dashboard
+uv run --extra dashboard black-scholes-dashboard
 ```
 
-Choose **Price from volatility** to see the theoretical price, Greeks, and
-spot and volatility sensitivity charts. Choose **IV from option premium** to
-solve for annualized implied volatility from a supplied premium per unit (not
-the total contract cost). The result includes the model premium, signed
-repricing residual, iteration count, and stopping reason.
+To inspect your own local reports already produced by the historical replay
+pipeline (private reports are not bundled or publicly accessible):
 
-The app opens with a default valuation. Click **Calculate** to apply changes
-to the mode or inputs. The persistent light/dark setting restyles the last
-calculated result without applying pending edits.
+```bash
+OPTIONS_LAB_REPORTS=/private/path/to/reports \
+  uv run --extra dashboard black-scholes-dashboard
+```
 
-The dashboard does not fetch market data or estimate volatility from stock
-returns. Supply your own inputs; timestamped quote acquisition belongs in a
-separate data pipeline.
+The configured directory is the only private-report input. Only direct
+`*-report.json` files are matched; subdirectories are not searched. There is no
+browser file picker or remote upload. A supplied directory loads historical
+reports only: empty directories and malformed reports are reported, never
+replaced with demo data. The app does not fetch live quotes, execute orders, or
+send report data to an external host. Keep the server local; this is not an
+authenticated multi-user data service.
+
+#### Replay workspace
+
+Use the **Session** and **Expiry (UTC)** dropdowns and the discrete
+**Recorded checkpoint · UTC** tabs to choose a recorded replay slice. Checkpoints
+are not a dropdown or continuous playback timeline; there is no play control.
+The **Option chain** opens with **View: IV** and **Side: OTM**. Switch **View**
+between **IV**, **Premium**, and **Greeks**, or **Side** between **OTM**, **Calls**,
+**Puts**, and **All**. Select a contract in the table or an observed
+**Volatility smile** point. Fitted curve points are not contracts. A retained
+selection remains selected only while it is visible; otherwise the nearest
+visible strike to the observed forward is selected.
+
+The context strip distinguishes **Spot** from the same-expiry **Forward** and
+labels missing, synthetic, quoted, quote-implied, derived, assumed, and modeled
+context explicitly. Missing spot is unavailable, not copied from the forward.
+**ATM strike** is quoted; **ATM IV** is quote-implied, not an observed volatility.
+**DTE** is derived from the selected UTC cutoff and expiry, not the filename.
+**Rate** is assumed and **Discount factor** is modeled. IV and model values use
+the recorded matched-future BBO midpoint, discount factor, ACT/365F maturity,
+and explicit continuously compounded rate assumption. Neither venue marks nor
+parity-implied forwards silently replace missing futures. IV is annualized
+decimal in exports; displayed percentages are presentation only.
+
+The contract panel preserves native and normalized quote information, IV solver
+results, timestamps, model assumptions, and risk units. Supported Greeks are
+conditional model sensitivities, not observed returns or hedging guarantees.
+Forward-based risk is not spot risk; unsupported Greeks and missing inputs remain
+unavailable rather than zero. Read the displayed risk basis and units before
+comparing contracts or scaling by position size.
+
+Quality labels are separate: quote usability, freshness, IV availability,
+fit eligibility, and diagnostic findings are not interchangeable. Freshness uses
+the report's quote-age threshold at the selected checkpoint; receipt availability
+and exchange time remain distinct. Crossed, missing, stale, or otherwise rejected
+books remain inspectable without being promoted to usable observations. A green
+usable label is not a liquidity, fill, or profit guarantee.
+
+Four diagnostic tabs share a **Diagnostic item** selector; **Quoted butterflies**
+is selected by default:
+
+- **Diagnostics:** coverage, fit warnings, and individual option-book quality.
+- **Parity:** a selected matched call/put pair and its independent future context.
+- **Midpoint warnings:** observed midpoint-based findings for the selected expiry's
+  ACT/365F maturity, not executable opportunities. Older calendar evidence may
+  lack the prior expiry or its legs; those limitations remain explicit.
+- **Quoted butterflies:** a selected quoted package, its legs and bid/ask basis.
+  The same-package midpoint comparison holds the stored legs and future hedge
+  fixed; it is not the worst-case observed midpoint signal. Stale, sequence-invalid,
+  or missing BBO inputs block the comparison rather than inventing prices.
+
+Checks retain their original limits. Finite-grid fitted-surface checks are not
+proofs of global arbitrage freedom. Butterfly costs use displayed indicative
+bid/ask sides where available, but are **before fees**, slippage, latency, and
+fill uncertainty; a candidate is neither an order nor evidence that simultaneous
+fills occurred.
+
+#### Local exports and data licensing
+
+Choose **Visible chain**, **IV observations**, **Fitted slice**, **Selected
+contract**, or **Selected diagnostic** under **Export scope**, select CSV or JSON
+under **Format**, and click **Export view**. Chain and IV exports honor the side
+filter; contract and diagnostic exports retain only the selected item plus its
+context.
+Diagnostic exports preserve raw evidence with annotated option/future inputs;
+changing the selection does not refit a surface or reingest the capture.
+Sorted records/keys include the exact cutoff and expiry, session/source and
+synthetic flag, selection/mode, units, assumptions, rate and forward provenance,
+normalized flags, and diagnostic limitations. CSV uses scalar columns and JSON
+for structured fields; nulls are empty cells (JSON preserves null explicitly).
+An empty scope exports zero JSON records or a metadata-only CSV row. Downloads
+are generated in memory for the local browser, without server-side export files.
+
+Private historical data remains subject to the provider's license and your
+access rights. Keep captures, reports, private exports, and private screenshots
+outside the repository; do not redistribute vendor data. The screenshots below
+use only the public synthetic demo. Synthetic books illustrate behavior, not
+live-market quality, trading performance, or empirical calibration validation.
+
+![Options Lab desktop synthetic replay](docs/images/options-lab-desktop.png)
+
+*Desktop: public synthetic demo with recorded checkpoint tabs, the default IV
+chain, volatility smile, and Quoted butterflies diagnostics.*
+
+![Options Lab mobile synthetic replay](docs/images/options-lab-mobile.png)
+
+*Mobile: the same public synthetic workspace stacked vertically, with diagnostic
+details and local export controls below the chain and smile.*
+
+#### Calculator
+
+The **Calculator** retains manual **Price from volatility** and **IV from option
+premium** workflows. Supply premium per unit, not total contract cost. Results
+include theoretical price, Greeks, sensitivity charts, and (for IV) the signed
+repricing residual, iteration count, and stopping reason. Click **Calculate** to
+apply pending inputs; switching the persistent light/dark theme restyles the
+last calculated result without applying those edits. The calculator does not
+fetch market data or estimate volatility from returns.
 
 The original `bs_call`, `bs_put`, `d1`, and `d2` names remain available through
 `BlackScholesPricingModel.py` for existing notebooks.
