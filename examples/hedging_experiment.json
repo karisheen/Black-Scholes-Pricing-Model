@@ -1,0 +1,46 @@
+{
+  "schema_version": "p5.19a.v1",
+  "experiment_id": "p519a-gbm-common-shocks-v1",
+  "contract": {
+    "kind": "call",
+    "strike": 100.0,
+    "maturity": 0.25,
+    "model_volatility": 0.2,
+    "rate": 0.03,
+    "dividend_yield": 0.0,
+    "quantity": -1.0,
+    "multiplier": 1.0,
+    "premium": null,
+    "initial_cash": 0.0,
+    "initial_inventory": 0.0
+  },
+  "market": {
+    "spot": 100.0,
+    "drift": 0.03,
+    "steps": 64,
+    "paths": 512,
+    "seeds": [1729, 2718, 31415],
+    "path_volatilities": [0.12, 0.2, 0.32]
+  },
+  "policies": [
+    {"id": "none", "kind": "none"},
+    {"id": "periodic_1", "kind": "periodic", "every": 1},
+    {"id": "periodic_4", "kind": "periodic", "every": 4},
+    {"id": "periodic_16", "kind": "periodic", "every": 16},
+    {"id": "threshold_005", "kind": "threshold", "threshold": 0.05},
+    {"id": "threshold_015", "kind": "threshold", "threshold": 0.15}
+  ],
+  "cost_schedules": [
+    {"id": "zero", "half_spread_bps": 0.0, "slippage_bps": 0.0, "fee_bps": 0.0},
+    {"id": "baseline", "half_spread_bps": 1.0, "slippage_bps": 0.5, "fee_bps": 0.5},
+    {"id": "adverse", "half_spread_bps": 5.0, "slippage_bps": 2.0, "fee_bps": 2.0}
+  ],
+  "zero_cost_reference": "zero",
+  "example": {
+    "seed": 1729,
+    "path_volatility": 0.2,
+    "policy": "periodic_1",
+    "cost": "baseline",
+    "path": 0
+  }
+}

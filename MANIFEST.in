@@ -1,5 +1,6 @@
 include IMPLEMENTATION_SUMMARY.md ROADMAP.md
 include docs/images/options-lab-desktop.png
 include docs/images/options-lab-mobile.png
+include docs/hedging-research.md docs/hedging-results.csv docs/images/hedging_tradeoff.svg
 recursive-include examples *.json *.py
 recursive-include tests/fixtures *.csv

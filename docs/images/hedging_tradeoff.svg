@@ -1,0 +1,149 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="610" viewBox="0 0 1200 610" role="img" aria-labelledby="title desc">
+<title id="title">Synthetic hedge error dispersion versus turnover</title>
+<desc id="desc">Common-shock synthetic scenarios, grouped by execution costs. Points show measured pooled sample standard deviations, not forecasts.</desc>
+<rect width="1200" height="610" fill="white"/>
+<g font-family="sans-serif" fill="#172033">
+<text x="55" y="35" font-size="22">Synthetic hedging: dispersion / turnover trade-off</text>
+<text x="55" y="60" font-size="13">Discounted net error sample SD (USD); turnover is mean hedge notional (USD). Axes shared across costs.</text>
+<text x="65.00" y="100" font-size="16">zero</text>
+<text x="65.00" y="117" font-size="10">half-spread/slippage/fee: 0/0/0 bps</text>
+<path d="M 65.00 455.00 H 391.67" stroke="#e2e8f0"/>
+<text x="60.00" y="459.00" text-anchor="end" font-size="10">0.00</text>
+<text x="65.00" y="475" text-anchor="middle" font-size="10">0</text>
+<path d="M 65.00 372.50 H 391.67" stroke="#e2e8f0"/>
+<text x="60.00" y="376.50" text-anchor="end" font-size="10">2.65</text>
+<text x="146.67" y="475" text-anchor="middle" font-size="10">105</text>
+<path d="M 65.00 290.00 H 391.67" stroke="#e2e8f0"/>
+<text x="60.00" y="294.00" text-anchor="end" font-size="10">5.30</text>
+<text x="228.33" y="475" text-anchor="middle" font-size="10">209</text>
+<path d="M 65.00 207.50 H 391.67" stroke="#e2e8f0"/>
+<text x="60.00" y="211.50" text-anchor="end" font-size="10">7.94</text>
+<text x="310.00" y="475" text-anchor="middle" font-size="10">314</text>
+<path d="M 65.00 125.00 H 391.67" stroke="#e2e8f0"/>
+<text x="60.00" y="129.00" text-anchor="end" font-size="10">10.59</text>
+<text x="391.67" y="475" text-anchor="middle" font-size="10">419</text>
+<path d="M 65.00 125.00 V 455.00 H 391.67" fill="none" stroke="#64748b"/>
+<circle cx="65.00" cy="332.89" r="4" fill="#2563eb"><title>none; generating vol=0.12; SD=3.91961 USD; turnover=0 USD; paired drag=0 USD</title></circle>
+<circle cx="181.07" cy="422.43" r="4" fill="#2563eb"><title>periodic_16; generating vol=0.12; SD=1.04534 USD; turnover=148.73 USD; paired drag=0 USD</title></circle>
+<circle cx="199.43" cy="430.83" r="4" fill="#2563eb"><title>threshold_015; generating vol=0.12; SD=0.775952 USD; turnover=172.251 USD; paired drag=0 USD</title></circle>
+<circle cx="224.12" cy="434.56" r="4" fill="#2563eb"><title>periodic_4; generating vol=0.12; SD=0.655961 USD; turnover=203.88 USD; paired drag=0 USD</title></circle>
+<circle cx="248.26" cy="437.67" r="4" fill="#2563eb"><title>threshold_005; generating vol=0.12; SD=0.556135 USD; turnover=234.821 USD; paired drag=0 USD</title></circle>
+<circle cx="299.43" cy="438.96" r="4" fill="#2563eb"><title>periodic_1; generating vol=0.12; SD=0.514799 USD; turnover=300.38 USD; paired drag=0 USD</title></circle>
+<polyline points="65.00,332.89 181.07,422.43 199.43,430.83 224.12,434.56 248.26,437.67 299.43,438.96" fill="none" stroke="#2563eb" stroke-opacity="0.45"/>
+<circle cx="65.00" cy="252.49" r="4" fill="#aa5808"><title>none; generating vol=0.2; SD=6.50027 USD; turnover=0 USD; paired drag=0 USD</title></circle>
+<text x="70.00" y="246.49" font-size="9">1</text>
+<circle cx="191.72" cy="404.91" r="4" fill="#aa5808"><title>periodic_16; generating vol=0.2; SD=1.60785 USD; turnover=162.372 USD; paired drag=0 USD</title></circle>
+<text x="196.72" y="398.91" font-size="9">4</text>
+<circle cx="230.71" cy="429.00" r="4" fill="#aa5808"><title>threshold_015; generating vol=0.2; SD=0.834608 USD; turnover=212.332 USD; paired drag=0 USD</title></circle>
+<text x="235.71" y="423.00" font-size="9">6</text>
+<circle cx="246.59" cy="429.19" r="4" fill="#aa5808"><title>periodic_4; generating vol=0.2; SD=0.828412 USD; turnover=232.683 USD; paired drag=0 USD</title></circle>
+<text x="251.59" y="423.19" font-size="9">3</text>
+<circle cx="299.89" cy="440.63" r="4" fill="#aa5808"><title>threshold_005; generating vol=0.2; SD=0.461271 USD; turnover=300.979 USD; paired drag=0 USD</title></circle>
+<text x="304.89" y="434.63" font-size="9">5</text>
+<circle cx="346.37" cy="441.81" r="4" fill="#aa5808"><title>periodic_1; generating vol=0.2; SD=0.423363 USD; turnover=360.526 USD; paired drag=0 USD</title></circle>
+<text x="351.37" y="435.81" font-size="9">2</text>
+<polyline points="65.00,252.49 191.72,404.91 230.71,429.00 246.59,429.19 299.89,440.63 346.37,441.81" fill="none" stroke="#aa5808" stroke-opacity="0.45"/>
+<circle cx="65.00" cy="125.00" r="4" fill="#047857"><title>none; generating vol=0.32; SD=10.5926 USD; turnover=0 USD; paired drag=0 USD</title></circle>
+<circle cx="201.71" cy="366.70" r="4" fill="#047857"><title>periodic_16; generating vol=0.32; SD=2.83433 USD; turnover=175.176 USD; paired drag=0 USD</title></circle>
+<circle cx="268.58" cy="400.10" r="4" fill="#047857"><title>periodic_4; generating vol=0.32; SD=1.76233 USD; turnover=260.855 USD; paired drag=0 USD</title></circle>
+<circle cx="271.71" cy="410.34" r="4" fill="#047857"><title>threshold_015; generating vol=0.32; SD=1.4336 USD; turnover=264.871 USD; paired drag=0 USD</title></circle>
+<circle cx="353.98" cy="415.30" r="4" fill="#047857"><title>threshold_005; generating vol=0.32; SD=1.27429 USD; turnover=370.28 USD; paired drag=0 USD</title></circle>
+<circle cx="391.67" cy="415.24" r="4" fill="#047857"><title>periodic_1; generating vol=0.32; SD=1.27638 USD; turnover=418.57 USD; paired drag=0 USD</title></circle>
+<polyline points="65.00,125.00 201.71,366.70 268.58,400.10 271.71,410.34 353.98,415.30 391.67,415.24" fill="none" stroke="#047857" stroke-opacity="0.45"/>
+<text x="431.67" y="100" font-size="16">baseline</text>
+<text x="431.67" y="117" font-size="10">half-spread/slippage/fee: 1/0.5/0.5 bps</text>
+<path d="M 431.67 455.00 H 758.33" stroke="#e2e8f0"/>
+<text x="426.67" y="459.00" text-anchor="end" font-size="10">0.00</text>
+<text x="431.67" y="475" text-anchor="middle" font-size="10">0</text>
+<path d="M 431.67 372.50 H 758.33" stroke="#e2e8f0"/>
+<text x="426.67" y="376.50" text-anchor="end" font-size="10">2.65</text>
+<text x="513.33" y="475" text-anchor="middle" font-size="10">105</text>
+<path d="M 431.67 290.00 H 758.33" stroke="#e2e8f0"/>
+<text x="426.67" y="294.00" text-anchor="end" font-size="10">5.30</text>
+<text x="595.00" y="475" text-anchor="middle" font-size="10">209</text>
+<path d="M 431.67 207.50 H 758.33" stroke="#e2e8f0"/>
+<text x="426.67" y="211.50" text-anchor="end" font-size="10">7.94</text>
+<text x="676.67" y="475" text-anchor="middle" font-size="10">314</text>
+<path d="M 431.67 125.00 H 758.33" stroke="#e2e8f0"/>
+<text x="426.67" y="129.00" text-anchor="end" font-size="10">10.59</text>
+<text x="758.33" y="475" text-anchor="middle" font-size="10">419</text>
+<path d="M 431.67 125.00 V 455.00 H 758.33" fill="none" stroke="#64748b"/>
+<circle cx="431.67" cy="332.89" r="4" fill="#2563eb"><title>none; generating vol=0.12; SD=3.91961 USD; turnover=0 USD; paired drag=0 USD</title></circle>
+<circle cx="547.74" cy="422.37" r="4" fill="#2563eb"><title>periodic_16; generating vol=0.12; SD=1.04727 USD; turnover=148.73 USD; paired drag=0.0298554 USD</title></circle>
+<circle cx="566.10" cy="430.84" r="4" fill="#2563eb"><title>threshold_015; generating vol=0.12; SD=0.775665 USD; turnover=172.251 USD; paired drag=0.034566 USD</title></circle>
+<circle cx="590.78" cy="434.57" r="4" fill="#2563eb"><title>periodic_4; generating vol=0.12; SD=0.655854 USD; turnover=203.88 USD; paired drag=0.0409215 USD</title></circle>
+<circle cx="614.93" cy="437.81" r="4" fill="#2563eb"><title>threshold_005; generating vol=0.12; SD=0.551701 USD; turnover=234.821 USD; paired drag=0.0471229 USD</title></circle>
+<circle cx="666.09" cy="439.16" r="4" fill="#2563eb"><title>periodic_1; generating vol=0.12; SD=0.508462 USD; turnover=300.38 USD; paired drag=0.0602883 USD</title></circle>
+<polyline points="431.67,332.89 547.74,422.37 566.10,430.84 590.78,434.57 614.93,437.81 666.09,439.16" fill="none" stroke="#2563eb" stroke-opacity="0.45"/>
+<circle cx="431.67" cy="252.49" r="4" fill="#aa5808"><title>none; generating vol=0.2; SD=6.50027 USD; turnover=0 USD; paired drag=0 USD</title></circle>
+<text x="436.67" y="246.49" font-size="9">1</text>
+<circle cx="558.39" cy="404.85" r="4" fill="#aa5808"><title>periodic_16; generating vol=0.2; SD=1.60976 USD; turnover=162.371 USD; paired drag=0.0325954 USD</title></circle>
+<text x="563.39" y="398.85" font-size="9">4</text>
+<circle cx="597.38" cy="428.93" r="4" fill="#aa5808"><title>threshold_015; generating vol=0.2; SD=0.836804 USD; turnover=212.332 USD; paired drag=0.0426167 USD</title></circle>
+<text x="602.38" y="422.93" font-size="9">6</text>
+<circle cx="613.26" cy="429.13" r="4" fill="#aa5808"><title>periodic_4; generating vol=0.2; SD=0.83048 USD; turnover=232.683 USD; paired drag=0.0467102 USD</title></circle>
+<text x="618.26" y="423.13" font-size="9">3</text>
+<circle cx="666.56" cy="440.57" r="4" fill="#aa5808"><title>threshold_005; generating vol=0.2; SD=0.463041 USD; turnover=300.979 USD; paired drag=0.0604159 USD</title></circle>
+<text x="671.56" y="434.57" font-size="9">5</text>
+<circle cx="713.03" cy="441.75" r="4" fill="#aa5808"><title>periodic_1; generating vol=0.2; SD=0.425238 USD; turnover=360.526 USD; paired drag=0.072376 USD</title></circle>
+<text x="718.03" y="435.75" font-size="9">2</text>
+<polyline points="431.67,252.49 558.39,404.85 597.38,428.93 613.26,429.13 666.56,440.57 713.03,441.75" fill="none" stroke="#aa5808" stroke-opacity="0.45"/>
+<circle cx="431.67" cy="125.00" r="4" fill="#047857"><title>none; generating vol=0.32; SD=10.5926 USD; turnover=0 USD; paired drag=0 USD</title></circle>
+<circle cx="568.38" cy="366.62" r="4" fill="#047857"><title>periodic_16; generating vol=0.32; SD=2.83691 USD; turnover=175.176 USD; paired drag=0.0351678 USD</title></circle>
+<circle cx="635.25" cy="399.82" r="4" fill="#047857"><title>periodic_4; generating vol=0.32; SD=1.77116 USD; turnover=260.855 USD; paired drag=0.0523734 USD</title></circle>
+<circle cx="638.38" cy="409.90" r="4" fill="#047857"><title>threshold_015; generating vol=0.32; SD=1.4475 USD; turnover=264.871 USD; paired drag=0.0531714 USD</title></circle>
+<circle cx="720.65" cy="414.60" r="4" fill="#047857"><title>threshold_005; generating vol=0.32; SD=1.29683 USD; turnover=370.28 USD; paired drag=0.0743455 USD</title></circle>
+<circle cx="758.33" cy="414.50" r="4" fill="#047857"><title>periodic_1; generating vol=0.32; SD=1.30008 USD; turnover=418.569 USD; paired drag=0.084046 USD</title></circle>
+<polyline points="431.67,125.00 568.38,366.62 635.25,399.82 638.38,409.90 720.65,414.60 758.33,414.50" fill="none" stroke="#047857" stroke-opacity="0.45"/>
+<text x="798.33" y="100" font-size="16">adverse</text>
+<text x="798.33" y="117" font-size="10">half-spread/slippage/fee: 5/2/2 bps</text>
+<path d="M 798.33 455.00 H 1125.00" stroke="#e2e8f0"/>
+<text x="793.33" y="459.00" text-anchor="end" font-size="10">0.00</text>
+<text x="798.33" y="475" text-anchor="middle" font-size="10">0</text>
+<path d="M 798.33 372.50 H 1125.00" stroke="#e2e8f0"/>
+<text x="793.33" y="376.50" text-anchor="end" font-size="10">2.65</text>
+<text x="880.00" y="475" text-anchor="middle" font-size="10">105</text>
+<path d="M 798.33 290.00 H 1125.00" stroke="#e2e8f0"/>
+<text x="793.33" y="294.00" text-anchor="end" font-size="10">5.30</text>
+<text x="961.67" y="475" text-anchor="middle" font-size="10">209</text>
+<path d="M 798.33 207.50 H 1125.00" stroke="#e2e8f0"/>
+<text x="793.33" y="211.50" text-anchor="end" font-size="10">7.94</text>
+<text x="1043.33" y="475" text-anchor="middle" font-size="10">314</text>
+<path d="M 798.33 125.00 H 1125.00" stroke="#e2e8f0"/>
+<text x="793.33" y="129.00" text-anchor="end" font-size="10">10.59</text>
+<text x="1125.00" y="475" text-anchor="middle" font-size="10">419</text>
+<path d="M 798.33 125.00 V 455.00 H 1125.00" fill="none" stroke="#64748b"/>
+<circle cx="798.33" cy="332.89" r="4" fill="#2563eb"><title>none; generating vol=0.12; SD=3.91961 USD; turnover=0 USD; paired drag=0 USD</title></circle>
+<circle cx="914.41" cy="422.15" r="4" fill="#2563eb"><title>periodic_16; generating vol=0.12; SD=1.05435 USD; turnover=148.73 USD; paired drag=0.134349 USD</title></circle>
+<circle cx="932.76" cy="430.84" r="4" fill="#2563eb"><title>threshold_015; generating vol=0.12; SD=0.775527 USD; turnover=172.251 USD; paired drag=0.155547 USD</title></circle>
+<circle cx="957.45" cy="434.55" r="4" fill="#2563eb"><title>periodic_4; generating vol=0.12; SD=0.656515 USD; turnover=203.879 USD; paired drag=0.184147 USD</title></circle>
+<circle cx="981.60" cy="438.24" r="4" fill="#2563eb"><title>threshold_005; generating vol=0.12; SD=0.538 USD; turnover=234.82 USD; paired drag=0.212053 USD</title></circle>
+<circle cx="1032.76" cy="439.79" r="4" fill="#2563eb"><title>periodic_1; generating vol=0.12; SD=0.488356 USD; turnover=300.379 USD; paired drag=0.271297 USD</title></circle>
+<polyline points="798.33,332.89 914.41,422.15 932.76,430.84 957.45,434.55 981.60,438.24 1032.76,439.79" fill="none" stroke="#2563eb" stroke-opacity="0.45"/>
+<circle cx="798.33" cy="252.49" r="4" fill="#aa5808"><title>none; generating vol=0.2; SD=6.50027 USD; turnover=0 USD; paired drag=0 USD</title></circle>
+<text x="803.33" y="246.49" font-size="9">1</text>
+<circle cx="925.05" cy="404.63" r="4" fill="#aa5808"><title>periodic_16; generating vol=0.2; SD=1.61685 USD; turnover=162.371 USD; paired drag=0.146679 USD</title></circle>
+<text x="930.05" y="398.63" font-size="9">4</text>
+<circle cx="964.04" cy="428.63" r="4" fill="#aa5808"><title>threshold_015; generating vol=0.2; SD=0.846311 USD; turnover=212.332 USD; paired drag=0.191775 USD</title></circle>
+<text x="969.04" y="422.63" font-size="9">6</text>
+<circle cx="979.93" cy="428.86" r="4" fill="#aa5808"><title>periodic_4; generating vol=0.2; SD=0.83913 USD; turnover=232.683 USD; paired drag=0.210196 USD</title></circle>
+<text x="984.93" y="422.86" font-size="9">3</text>
+<circle cx="1033.23" cy="440.20" r="4" fill="#aa5808"><title>threshold_005; generating vol=0.2; SD=0.475224 USD; turnover=300.978 USD; paired drag=0.271872 USD</title></circle>
+<text x="1038.23" y="434.20" font-size="9">5</text>
+<circle cx="1079.70" cy="441.32" r="4" fill="#aa5808"><title>periodic_1; generating vol=0.2; SD=0.43912 USD; turnover=360.526 USD; paired drag=0.325692 USD</title></circle>
+<text x="1084.70" y="435.32" font-size="9">2</text>
+<polyline points="798.33,252.49 925.05,404.63 964.04,428.63 979.93,428.86 1033.23,440.20 1079.70,441.32" fill="none" stroke="#aa5808" stroke-opacity="0.45"/>
+<circle cx="798.33" cy="125.00" r="4" fill="#047857"><title>none; generating vol=0.32; SD=10.5926 USD; turnover=0 USD; paired drag=0 USD</title></circle>
+<circle cx="935.05" cy="366.33" r="4" fill="#047857"><title>periodic_16; generating vol=0.32; SD=2.8463 USD; turnover=175.176 USD; paired drag=0.158255 USD</title></circle>
+<circle cx="1001.91" cy="398.83" r="4" fill="#047857"><title>periodic_4; generating vol=0.32; SD=1.80295 USD; turnover=260.854 USD; paired drag=0.23568 USD</title></circle>
+<circle cx="1005.05" cy="408.35" r="4" fill="#047857"><title>threshold_015; generating vol=0.32; SD=1.49757 USD; turnover=264.871 USD; paired drag=0.239271 USD</title></circle>
+<circle cx="1087.31" cy="412.09" r="4" fill="#047857"><title>threshold_005; generating vol=0.32; SD=1.37744 USD; turnover=370.28 USD; paired drag=0.334555 USD</title></circle>
+<circle cx="1125.00" cy="411.86" r="4" fill="#047857"><title>periodic_1; generating vol=0.32; SD=1.38483 USD; turnover=418.569 USD; paired drag=0.378207 USD</title></circle>
+<polyline points="798.33,125.00 935.05,366.33 1001.91,398.83 1005.05,408.35 1087.31,412.09 1125.00,411.86" fill="none" stroke="#047857" stroke-opacity="0.45"/>
+<text x="65" y="515" font-size="14" fill="#2563eb">path vol = 0.12</text>
+<text x="265" y="515" font-size="14" fill="#aa5808">path vol = 0.2</text>
+<text x="465" y="515" font-size="14" fill="#047857">path vol = 0.32</text>
+<text x="65" y="545" font-size="12">Matched-volatility labels: 1: none · 2: periodic_1 · 3: periodic_4 · 4: periodic_16 · 5: threshold_005 · 6: threshold_015</text>
+<text x="65" y="567" font-size="12">SD is not RMSE or expected profit. Common shocks pair policy, cost and volatility stress comparisons.</text>
+<text x="65" y="589" font-size="11">p519a-gbm-common-shocks-v1; 3 seeds x 512 paths; 64 steps; model vol=0.2</text>
+</g></svg>
