@@ -182,6 +182,8 @@ free archive is not assumed.
     Engineering 5, Effort 4.
     - [ ] Discover BTC option instruments and track listing, state, and expiry
       changes without repeatedly polling the full catalog.
+      Prior-day Tardis catalog selection freezes the historical option strip
+      before observing quotes; live listing lifecycle tracking remains open.
     - [ ] Ingest index and forward prices, chain summaries, bid/ask quotes,
       grouped order books, trades, open interest, and settlement prices.
     - [ ] Maintain books from snapshots and incremental updates with sequence
@@ -196,6 +198,8 @@ free archive is not assumed.
       The [linear sample report](README.md#btcusdc-chain-and-iv-quality-report)
       now verifies explicit BTC/USDC units and compares bid/ask IV and parity
       against same-expiry futures. Venue mark and Greek comparisons remain open.
+      A separate quoted butterfly scan tests selected triplets against
+      displayed option and futures spreads, without inferring fills.
     - [ ] Document rate limits, authentication boundaries, units, retention,
       and data-use terms.
 

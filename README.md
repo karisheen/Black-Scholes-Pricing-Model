@@ -367,6 +367,61 @@ books later failed the 30-second freshness gate, but both expiry fits still
 had ten eligible OTM strikes. This is one short session, not a liquidity or
 execution backtest. Real samples and full reports are not in version control.
 
+#### Freeze strikes from the Tardis catalog
+
+Instead of a fixed grid, choose strikes from a complete [Tardis `/symbols` response](https://docs.tardis.dev/api/http-api-reference#symbols)
+queried for the **previous UTC day**, with the replay day as the exclusive
+end. The selector also rejects contracts first seen on or after the replay
+day, because archive availability is day-granular. This is an archive-based
+universe, not an official historical exchange listing feed.
+
+```bash
+work=$(mktemp -d "${TMPDIR:-/tmp}/btc-usdc-catalog.XXXXXX")
+curl -fsSG --compressed 'https://api.tardis.dev/v1/symbols' \
+  --data-urlencode 'exchanges=deribit' --data-urlencode 'baseCurrency=BTC' \
+  --data-urlencode 'quoteCurrency=USDC' --data-urlencode 'type=option' \
+  --data-urlencode 'availableSince=2026-07-31' \
+  --data-urlencode 'availableTo=2026-08-01' --data-urlencode 'limit=1000' \
+  --output "$work/catalog.json"
+
+tardis_book() {
+  curl -fsSG --compressed 'https://api.tardis.dev/v1/data-feeds/deribit' \
+    --data-urlencode 'from=2026-08-01' --data-urlencode "sliceSize=$1" \
+    --data-urlencode "filters=$2" --output "$3"
+}
+tardis_book 1 '[{"channel":"book","symbols":["BTC_USDC-28AUG26","BTC_USDC-25SEP26"]}]' \
+  "$work/futures.ndjson" &&
+uv run python -m quant_pricing.deribit_chain "$work/futures.ndjson" \
+  --catalog "$work/catalog.json" --expiry 28AUG26 --expiry 25SEP26 \
+  --as-of 2026-08-01T00:00:10Z > "$work/selection.json" &&
+tardis_book 2 "$(jq -c .tardis_filter "$work/selection.json")" "$work/books.ndjson" &&
+uv run python -m quant_pricing.deribit_chain "$work/books.ndjson" \
+  --selection "$work/selection.json" --rate 0 \
+  --as-of 2026-08-01T00:00:20Z --as-of 2026-08-01T00:01:30Z > "$work/report.json"
+```
+
+The planner freezes up to nine paired call/put strikes by absolute log
+moneyness to each expiry's own dated future, before inspecting option books.
+It records the catalog checksum and the futures observations used to select
+strikes. The report validates those anchors against the full tape, refuses
+earlier cutoffs, and keeps missing strikes instead of replacing them. A
+paginated catalog must first be combined into a complete local response.
+
+Each expiry now has a separate `quoted_butterflies` report. It checks
+adjacent selected strike triplets using asks for bought wings and bids for
+the sold center, including unequal strike spacing. The check considers
+call/put substitutions and crosses the dated futures spread for the net
+hedge. It reports the lowest entry cost, constituent legs, and an indicative
+size cap. A negative cost is a **candidate before fees**, not a simultaneous
+fill or tradable lot guarantee. Missing or unusable legs reduce coverage;
+the scan does not bridge gaps or replace midpoint diagnostics.
+
+Across the four Aug-Nov first-of-month sample days, this rule recovered
+both expiry fits at all three checkpoints per day. The fixed grid previously
+missed the August back expiry. The new scan checked 168 triplet observations
+with no negative quoted entry cost, despite 53 midpoint findings. These are
+repeated checks on short recorded sessions, not independent trading trials.
+
 ### Synthetic surface, portfolio, and exercise workflow
 
 ```bash
@@ -425,6 +480,8 @@ src/quant_pricing/
 ├── replay.py                # synthetic provider and optional Parquet archive
 ├── tardis_deribit.py        # native historical book reconstruction and CLI
 ├── deribit_chain.py         # historical linear BTC/USDC IV quality report
+├── deribit_catalog.py       # deterministic prior-day strike selection
+├── butterfly.py             # spread-aware weighted butterfly diagnostics
 ├── parity.py                # parity and conditional carry diagnostics
 ├── treasury.py              # Federal Reserve GSW zero-yield adapter
 ├── synthetic_chain.py       # deterministic SSVI chains and injected quote faults

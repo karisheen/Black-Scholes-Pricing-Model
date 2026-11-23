@@ -10,7 +10,12 @@ from typing import Any
 import pytest
 
 from quant_pricing.black76 import price
-from quant_pricing.deribit_chain import main, replay_chain
+from quant_pricing.deribit_chain import (
+    main,
+    plan_chain,
+    replay_chain,
+    replay_selected_chain,
+)
 
 _DAY = "2026-10-01"
 _BASE = datetime(2026, 10, 1, tzinfo=timezone.utc)
@@ -196,3 +201,106 @@ def test_report_scopes_one_sided_solver_failure(tmp_path: Path, capsys: Any) -> 
     assert first["bid_ask_iv_width"] is None
     assert main(args) == 0
     assert capsys.readouterr().out == result
+
+
+def _catalog_bytes() -> bytes:
+    rows = [
+        {
+            "exchange": "deribit",
+            "id": f"BTC_USDC-30OCT26-{strike}-{side}",
+            "baseCurrency": "BTC",
+            "quoteCurrency": "USDC",
+            "type": "option",
+            "availableSince": "2026-09-30T00:00:00.000Z",
+        }
+        for strike in _STRIKES
+        for side in "CP"
+    ]
+    return json.dumps({"symbols": rows, "nextCursor": None}).encode()
+
+
+def test_catalog_selection_is_frozen_before_option_books_are_seen(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    future = _snapshot("BTC_USDC-30OCT26", 99.9, 100.1)
+    capture, catalog, plan = (
+        tmp_path / filename
+        for filename in ("capture.ndjson", "catalog.json", "plan.json")
+    )
+    capture.write_text(future + _TAIL, encoding="utf-8")
+    catalog.write_bytes(_catalog_bytes())
+    selection_args = [
+        str(capture),
+        "--catalog",
+        str(catalog),
+        "--expiry",
+        "30OCT26",
+        "--strikes-per-expiry",
+        "3",
+        "--as-of",
+        f"{_DAY}T00:00:01Z",
+    ]
+    assert main(selection_args) == 0
+    selection_json = capsys.readouterr().out
+    plan.write_text(selection_json, encoding="utf-8")
+    selection = json.loads(selection_json)
+    assert selection["strips"][0]["strikes"] == [90, 100, 110]
+    assert selection["tardis_filter"][0]["symbols"] == [
+        "BTC_USDC-30OCT26",
+        *(
+            f"BTC_USDC-30OCT26-{strike}-{side}"
+            for strike in (90, 100, 110)
+            for side in "CP"
+        ),
+    ]
+
+    # Both center legs are absent. A valid, unselected strike cannot replace them.
+    options = _options("30OCT26", (90, 110, 120))
+    capture.write_text(future + "".join(options) + _TAIL, encoding="utf-8")
+    report_args = [
+        str(capture),
+        "--selection",
+        str(plan),
+        "--rate",
+        "0",
+        "--as-of",
+        f"{_DAY}T00:00:02Z",
+    ]
+    assert main(report_args) == 0
+    output = json.loads(capsys.readouterr().out)
+    assert output["catalog_selection"] == selection
+    assert len(output["checkpoints"]) == 1
+    expiry = output["checkpoints"][0]["expiries"][0]
+    assert {o["strike"] for o in expiry["options"]} == {90, 100, 110}
+    assert expiry["coverage"]["two_sided_iv"] == 4
+    assert expiry["quoted_butterflies"]["triplets_checked"] == 0
+    assert expiry["quoted_butterflies"]["triplets"][0]["best_package"] is None
+
+
+def test_catalog_replay_rejects_lookahead_and_a_different_futures_anchor() -> None:
+    old = _snapshot("BTC_USDC-30OCT26", 99.9, 100.1)
+    plan = plan_chain((old, _TAIL), _catalog_bytes(), ["30OCT26"], f"{_DAY}T00:00:01Z")
+    with pytest.raises(ValueError, match="precedes catalog selection"):
+        replay_selected_chain((old, _TAIL), plan, [f"{_DAY}T00:00:00Z"], rate=0)
+    revised = _snapshot("BTC_USDC-30OCT26", 99.9, 100.2)
+    with pytest.raises(ValueError, match="disagrees with selection anchor"):
+        replay_selected_chain((revised, _TAIL), plan, [f"{_DAY}T00:00:01Z"], rate=0)
+
+
+def test_quoted_butterfly_report_flags_a_negative_entry_cost() -> None:
+    prefix = "BTC_USDC-30OCT26"
+    lines = (
+        _snapshot(prefix, 99.9, 100.1),
+        _snapshot(f"{prefix}-90-C", 11, 12),
+        _snapshot(f"{prefix}-100-C", 25, 26),
+        _snapshot(f"{prefix}-110-C", 2, 3),
+        _TAIL,
+    )
+    data: dict[str, Any] = replay_chain(
+        lines, ["30OCT26"], [90, 100, 110], [f"{_DAY}T00:00:01Z"], rate=0
+    )
+    expiry = data["checkpoints"][0]["expiries"][0]
+    assert expiry["fit"] is None
+    checks = expiry["quoted_butterflies"]
+    assert checks["candidate_count"] == 1
+    assert checks["triplets"][0]["best_package"]["net_entry_cost"] == -17.5
