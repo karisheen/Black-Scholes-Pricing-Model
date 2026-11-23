@@ -32,23 +32,23 @@ reproducible workflows.
 
 ## Model and conventions
 
-For spot \(S\), strike \(K\), time to expiry \(T\), continuously compounded
-risk-free rate \(r\), continuous dividend yield \(q\), and annualized volatility
-\(\sigma\):
+For spot $S$, strike $K$, time to expiry $T$, continuously compounded
+risk-free rate $r$, continuous dividend yield $q$, and annualized volatility
+$\sigma$:
 
-\[
+$$
 d_1 =
 \frac{\ln(S/K) + (r-q+\tfrac{1}{2}\sigma^2)T}
      {\sigma\sqrt{T}},
 \qquad
 d_2 = d_1-\sigma\sqrt{T}.
-\]
+$$
 
-\[
+$$
 C = Se^{-qT}N(d_1)-Ke^{-rT}N(d_2),
 \qquad
 P = Ke^{-rT}N(-d_2)-Se^{-qT}N(-d_1).
-\]
+$$
 
 The implementation assumes European exercise, frictionless markets, continuous
 trading, constant rates and volatility, lognormal diffusion, and no discrete
@@ -77,11 +77,14 @@ with `log_ndtr` and `expm1`, reducing cancellation between nearly equal terms.
 Implied volatility is solved only after checking the European no-arbitrage
 bounds:
 
-\[
-\max(Se^{-qT}-Ke^{-rT},0) \le C < Se^{-qT},
-\]
+$$
+\begin{aligned}
+\max(Se^{-qT}-Ke^{-rT},0) &\le C < Se^{-qT},\\
+\max(Ke^{-rT}-Se^{-qT},0) &\le P < Ke^{-rT}.
+\end{aligned}
+$$
 
-with the analogous put bounds. The solver expands a volatility bracket, accepts
+The solver expands a volatility bracket, accepts
 Newton updates only inside a safeguarded interior, and otherwise bisects.
 Success returns volatility, iteration count, residual, normalized residual,
 termination reason, final bracket, and the repriced value. Bound violations,
@@ -288,19 +291,14 @@ are generated in memory for the local browser, without server-side export files.
 
 Private historical data remains subject to the provider's license and your
 access rights. Keep captures, reports, private exports, and private screenshots
-outside the repository; do not redistribute vendor data. The screenshots below
-use only the public synthetic demo. Synthetic books illustrate behavior, not
+outside the repository; do not redistribute vendor data. The screenshot below
+uses only the public synthetic demo. Synthetic books illustrate behavior, not
 live-market quality, trading performance, or empirical calibration validation.
 
 ![Options Lab desktop synthetic replay](docs/images/options-lab-desktop.png)
 
 *Desktop: public synthetic demo with recorded checkpoint tabs, the default IV
 chain, volatility smile, and Quoted butterflies diagnostics.*
-
-![Options Lab mobile synthetic replay](docs/images/options-lab-mobile.png)
-
-*Mobile: the same public synthetic workspace stacked vertically, with diagnostic
-details and local export controls below the chain and smile.*
 
 #### Calculator
 
@@ -551,7 +549,7 @@ uv build
 
 The test suite validates:
 
-- canonical published prices and Greeks for the \(S=K=100\) one-year case;
+- canonical published prices and Greeks for the $S=K=100$ one-year case;
 - analytic Greeks against central finite differences;
 - dividend-adjusted put–call parity and call/put Greek identities;
 - no-arbitrage bounds and expected monotonicity;
