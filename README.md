@@ -537,6 +537,20 @@ Fit a clean and deliberately damaged synthetic chain, reprice a portfolio
 against the fitted surface, and compare European and American exercise with
 a discrete cash dividend. This is a verification workflow, not a backtest.
 
+### Synthetic delta hedging and P&L attribution
+
+```bash
+uv run python -m quant_pricing.hedge_experiment \
+  examples/hedging_experiment.json --output-dir /tmp/hedging-research
+```
+
+Compare an unhedged European option with periodic and delta-band hedges on
+the **same seeded spot paths**. The experiment varies generating volatility
+and spot execution costs independently of the volatility used to mark the
+option. It runs offline without Dash, market-data credentials, or a live feed.
+See the [research report](docs/hedging-research.md) for the accounting
+identities, reproduction details, measured trade-offs, and limitations.
+
 ## Validation and quality checks
 
 ```bash
@@ -592,6 +606,9 @@ src/quant_pricing/
 ├── synthetic_chain.py       # deterministic SSVI chains and injected quote faults
 ├── surface.py               # IV observations, SVI fits, and arbitrage checks
 ├── risk.py                  # portfolio Greeks, scenarios, attribution, and limits
+├── hedge_paths.py           # seeded GBM scenarios and spot/forward initialization
+├── hedging.py               # causal spot-hedge policies and self-financing ledger
+├── hedge_experiment.py      # paired experiments, metrics, and research CLI
 ├── binomial.py              # independent listed-option exercise reference
 ├── option_chain.py          # frozen-chain CLI and per-side IV report
 ├── cli.py                   # command-line adapter
@@ -628,8 +645,9 @@ Black–Scholes–Merton is not an empirical claim that volatility is constant o
 returns are exactly lognormal. It is a transparent baseline and quoting
 framework. Fitted surfaces are numerically checked on a declared domain;
 the checks are not a global no-arbitrage guarantee. The binomial reference
-uses escrowed, grid-aligned cash dividends. The toolkit does not model inverse
-settlement, stochastic volatility, transaction costs, or execution.
+uses escrowed, grid-aligned cash dividends. The synthetic hedging experiment
+models proportional fees, spread and slippage, not observed fills, latency
+or market impact. No inverse settlement, stochastic volatility or live execution.
 
 Use of this software is educational; it is not investment advice or a
 production trading system.
