@@ -8,6 +8,7 @@ This is neither a full-chain nor a different-calendar arbitrage claim.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from fractions import Fraction
 from itertools import product
@@ -189,6 +190,20 @@ def _package(
     )
 
 
+def butterfly_strike_weights(
+    strikes: tuple[float, float, float],
+) -> tuple[Fraction, Fraction, Fraction]:
+    """Exact wing/body weights for the declared (binary float) strikes."""
+    low, middle, high = (Fraction(strike) for strike in strikes)
+    if not low < middle < high:
+        raise InputValidationError("butterfly strikes must increase strictly")
+    return (
+        (high - middle) / (high - low),
+        Fraction(-1),
+        (middle - low) / (high - low),
+    )
+
+
 def check_quoted_butterflies(
     rows: tuple[SnapshotQuote, ...],
     future: SnapshotQuote,
@@ -246,8 +261,7 @@ def check_quoted_butterflies(
     strikes = sorted(by_strike)
     checks: list[ButterflyCheck] = []
     for low, middle, high in zip(strikes, strikes[1:], strikes[2:], strict=False):
-        a, b, c = Fraction(low), Fraction(middle), Fraction(high)
-        exact_weights = ((c - b) / (c - a), Fraction(-1), (b - a) / (c - a))
+        exact_weights = butterfly_strike_weights((low, middle, high))
         best: ButterflyPackage | None = None
         checked = 0
         flags: list[str] = []
@@ -283,3 +297,81 @@ def check_quoted_butterflies(
             )
         )
     return tuple(checks)
+
+
+@dataclass(frozen=True, slots=True)
+class ButterflyBook:
+    """Normalized per-underlying BBO for comparing an already chosen package."""
+
+    bid: float
+    ask: float
+    flags: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class ButterflyCostInputs:
+    """Stored economic inputs for repricing, independent of candidate metadata."""
+
+    option_legs: tuple[ButterflyOptionLeg, ...]
+    futures_hedge: ButterflyFuturesHedge | None
+    net_entry_cost: float
+
+
+@dataclass(frozen=True, slots=True)
+class ButterflyCostComparison:
+    quoted_cost: float
+    midpoint_cost: float | None
+    crossing_cost: float | None
+    flags: tuple[str, ...]
+
+
+def compare_butterfly_costs(
+    package: ButterflyPackage | ButterflyCostInputs,
+    books: Mapping[str, ButterflyBook],
+    discount_factor: float,
+) -> ButterflyCostComparison:
+    """Reprice the *same* stored legs/hedge at midpoint, without searching again.
+
+    Books and stored leg prices must both be normalized per underlying unit.
+    Preserve the stored strike cash adjustment; replace only the crossed option
+    and futures prices. Flags block comparison, including stale/sequence issues.
+    Midpoints are not fills. No fees, financing or capacity guarantees are added.
+    """
+    _positive(discount_factor, "discount_factor")
+    differences: list[float] = []
+    flags: list[str] = []
+    legs = [
+        (leg.symbol, leg.signed_weight, leg.price, 1.0) for leg in package.option_legs
+    ]
+    if package.futures_hedge is not None:
+        hedge = package.futures_hedge
+        legs.append((hedge.symbol, hedge.signed_weight, hedge.price, discount_factor))
+    for symbol, weight, price, discount in legs:
+        book = books.get(symbol)
+        if book is None:
+            flags.append(f"{symbol}:missing")
+            continue
+        flags.extend(f"{symbol}:{flag}" for flag in book.flags)
+        if not all(isfinite(value) and value >= 0 for value in (book.bid, book.ask)):
+            flags.append(f"{symbol}:invalid_price")
+        elif book.bid > book.ask:
+            flags.append(f"{symbol}:crossed")
+        else:
+            midpoint = book.bid / 2 + book.ask / 2
+            differences.append(discount * weight * (midpoint - price))
+    if flags:
+        return ButterflyCostComparison(
+            package.net_entry_cost, None, None, tuple(dict.fromkeys(flags))
+        )
+    try:
+        difference = fsum(differences)
+        midpoint_cost = fsum((package.net_entry_cost, difference))
+    except (OverflowError, ValueError):
+        midpoint_cost = float("nan")
+    if not isfinite(midpoint_cost):
+        return ButterflyCostComparison(
+            package.net_entry_cost, None, None, ("nonfinite_calculation",)
+        )
+    return ButterflyCostComparison(
+        package.net_entry_cost, midpoint_cost, -difference, ()
+    )

@@ -10,7 +10,13 @@ from typing import Literal
 import pytest
 
 from quant_pricing.black_scholes import OptionType
-from quant_pricing.butterfly import check_quoted_butterflies
+from quant_pricing.butterfly import (
+    ButterflyBook,
+    ButterflyCostInputs,
+    butterfly_strike_weights,
+    check_quoted_butterflies,
+    compare_butterfly_costs,
+)
 from quant_pricing.exceptions import InputValidationError
 from quant_pricing.market import (
     Forward,
@@ -337,3 +343,113 @@ def test_raw_invalid_books_are_excluded_even_without_snapshot_flags(
     assert check.best_package is None
     assert check.negative_cost_candidate is None
     json.dumps(asdict(check), allow_nan=False)
+
+
+def test_same_package_midpoints_preserve_weighted_hedge_and_normalized_units() -> None:
+    rows = (
+        _option(
+            90, OptionType.CALL, 28, 30, multiplier=2, premium_basis="per_contract"
+        ),
+        _option(100, OptionType.PUT, 10, 11),
+        _option(130, OptionType.CALL, 1, 2),
+    )
+    future = _row(FUTURE, 119, 121, 3, 8)
+    (check,) = check_quoted_butterflies(rows, future, 0.9)
+    package = check.best_package
+    assert package is not None
+    books = {
+        "BTC-90-call": ButterflyBook(14, 15),
+        "BTC-100-put": ButterflyBook(10, 11),
+        "BTC-130-call": ButterflyBook(1, 2),
+        "BTC-FUTURE": ButterflyBook(119, 121),
+    }
+    result = compare_butterfly_costs(package, books, 0.9)
+    assert result.quoted_cost == pytest.approx(-15.35)
+    assert result.midpoint_cost == pytest.approx(-17.25)
+    assert result.crossing_cost == pytest.approx(1.9)
+    assert result.flags == ()
+    inputs = ButterflyCostInputs(
+        package.option_legs, package.futures_hedge, package.net_entry_cost
+    )
+    assert compare_butterfly_costs(inputs, books, 0.9) == result
+    books["BTC-90-call"] = ButterflyBook(14, 15, ("stale", "sequence_gap"))
+    blocked = compare_butterfly_costs(package, books, 0.9)
+    assert blocked.midpoint_cost is None
+    assert blocked.quoted_cost == result.quoted_cost
+    assert blocked.flags == ("BTC-90-call:stale", "BTC-90-call:sequence_gap")
+    assert compare_butterfly_costs(inputs, books, 0.9) == blocked
+
+
+@pytest.mark.parametrize(
+    "book,flag",
+    [
+        (None, "missing"),
+        (ButterflyBook(20, 10), "crossed"),
+        (ButterflyBook(float("nan"), 10), "invalid_price"),
+    ],
+)
+def test_comparison_rejects_missing_invalid_or_crossed_books(
+    book: ButterflyBook | None, flag: str
+) -> None:
+    (check,) = check_quoted_butterflies(_chain(), _row(FUTURE, 99, 101), 1)
+    package = check.best_package
+    assert package is not None
+    books = {
+        leg.symbol: ButterflyBook(leg.price, leg.price) for leg in package.option_legs
+    }
+    symbol = package.option_legs[0].symbol
+    if book is None:
+        del books[symbol]
+    else:
+        books[symbol] = book
+    result = compare_butterfly_costs(package, books, 1)
+    assert result.midpoint_cost is None
+    assert result.crossing_cost is None
+    assert result.flags == (f"{symbol}:{flag}",)
+
+
+def test_same_package_comparison_without_hedge_and_overflow_guard() -> None:
+    (check,) = check_quoted_butterflies(_chain(), _row(FUTURE, 99, 101), 1)
+    package = check.best_package
+    assert package is not None
+    books = {
+        leg.symbol: ButterflyBook(leg.price, leg.price) for leg in package.option_legs
+    }
+    result = compare_butterfly_costs(package, books, 1)
+    assert result.midpoint_cost == result.quoted_cost
+    assert result.crossing_cost == 0
+    broken = replace(
+        package,
+        option_legs=tuple(
+            replace(leg, signed_weight=1e308) for leg in package.option_legs
+        ),
+    )
+    huge_books = {
+        leg.symbol: ButterflyBook(1e308, 1e308) for leg in package.option_legs
+    }
+    assert compare_butterfly_costs(broken, huge_books, 1).flags == (
+        "nonfinite_calculation",
+    )
+    # Opposing infinities reach fsum's explicit error branch.
+    broken = replace(
+        broken,
+        option_legs=(
+            replace(broken.option_legs[0], signed_weight=-1e308),
+            *broken.option_legs[1:],
+        ),
+    )
+    assert compare_butterfly_costs(broken, huge_books, 1).midpoint_cost is None
+    with pytest.raises(InputValidationError, match="discount_factor"):
+        compare_butterfly_costs(package, books, 0)
+
+
+def test_exact_strike_weights_are_shared_with_quoted_checker() -> None:
+    assert tuple(
+        str(weight) for weight in butterfly_strike_weights((90, 100, 120))
+    ) == (
+        "2/3",
+        "-1",
+        "1/3",
+    )
+    with pytest.raises(InputValidationError, match="increase strictly"):
+        butterfly_strike_weights((90, 90, 120))

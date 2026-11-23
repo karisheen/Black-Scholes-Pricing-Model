@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, TypedDict
@@ -20,6 +21,8 @@ from quant_pricing.black_scholes import (
 )
 from quant_pricing.exceptions import PricingError
 from quant_pricing.implied_volatility import ImpliedVolatilityResult, implied_volatility
+from quant_pricing.lab_data import load_reports
+from quant_pricing.lab_workspace import register_replay_callbacks, replay_layout
 
 FloatArray = NDArray[np.float64]
 PricingMode = Literal["price", "iv"]
@@ -164,17 +167,17 @@ _COLORS = {
     "button_text": "var(--dashboard-button-text)",
 }
 _PLOT_COLORS = {
-    "call": "#4c9aff",
-    "put": "#ef5350",
-    "accent": "#26a69a",
-    "marker": "#7b879c",
+    "call": "#1aabf4",
+    "put": "#e47d70",
+    "accent": "#ffa51a",
+    "marker": "#a9a89a",
 }
 
 
 def theme_class_name(theme: str | None) -> str:
     """Return the application class for a supported color theme."""
 
-    normalized = "dark" if theme == "dark" else "light"
+    normalized = "light" if theme == "light" else "dark"
     return f"dashboard-shell theme-{normalized}"
 
 
@@ -301,6 +304,15 @@ def _sensitivity_figures(
         margin={"l": 50, "r": 20, "t": 55, "b": 45},
         showlegend=False,
     )
+    dark = theme == "dark"
+    for figure in (spot_figure, volatility_figure):
+        figure.update_layout(
+            paper_bgcolor="#48483a" if dark else "#f2f0e5",
+            plot_bgcolor="#48483a" if dark else "#f2f0e5",
+            font={"color": "#f5f2e9" if dark else "#292a24"},
+        )
+        figure.update_xaxes(gridcolor="#626253" if dark else "#d7d4c6")
+        figure.update_yaxes(gridcolor="#626253" if dark else "#d7d4c6")
     return spot_figure, volatility_figure
 
 
@@ -409,7 +421,9 @@ def render_analysis(
                 ],
                 style={
                     "display": "grid",
-                    "gridTemplateColumns": "repeat(auto-fit, minmax(320px, 1fr))",
+                    "gridTemplateColumns": (
+                        "repeat(auto-fit, minmax(min(100%, 320px), 1fr))"
+                    ),
                     "gap": "1rem",
                     "marginTop": "1rem",
                 },
@@ -461,74 +475,72 @@ def _number_input(
     )
 
 
-def create_app() -> Dash:
-    """Create the Dash application without starting a server."""
+def create_app(report_dir: str | Path | None = None) -> Dash:
+    """Create Options Lab with configured offline reports or a public demo."""
 
     assets_folder = Path(__file__).with_name("assets")
+    library = load_reports(
+        report_dir if report_dir is not None else os.environ.get("OPTIONS_LAB_REPORTS")
+    )
     app = Dash(__name__, assets_folder=str(assets_folder))
-    app.title = "Black-Scholes-Merton Analytics"
+    app.title = "Options Lab"
     app.layout = html.Div(
         id="app-shell",
-        className=theme_class_name("light"),
+        className=theme_class_name("dark"),
         children=[
             dcc.Store(id="submitted-scenario"),
             html.Main(
                 [
                     html.Header(
                         [
-                            html.Div(
-                                [
-                                    html.H1(
-                                        "Black-Scholes-Merton Analytics",
-                                        style={"marginBottom": "0.35rem"},
-                                    ),
-                                    html.P(
-                                        "Deterministic European option valuation "
-                                        "and analytic risk.",
-                                        style={
-                                            "marginTop": "0",
-                                            "color": _COLORS["muted"],
-                                        },
-                                    ),
-                                ]
+                            html.Span("OPTIONS LAB", className="lab-brand"),
+                            dcc.RadioItems(
+                                id="lab-navigation",
+                                options=[
+                                    {"label": "Replay", "value": "replay"},
+                                    {"label": "Calculator", "value": "calculator"},
+                                ],
+                                value="replay",
+                                inline=True,
+                                className="lab-navigation",
                             ),
                             html.Div(
                                 [
-                                    html.Label(
-                                        "Appearance",
-                                        htmlFor="theme-mode",
-                                        style={
-                                            "fontWeight": "600",
-                                            "fontSize": "0.85rem",
-                                        },
-                                    ),
+                                    html.Span("Appearance", className="lab-muted"),
                                     dcc.RadioItems(
                                         id="theme-mode",
                                         options=[
-                                            {"label": "Light", "value": "light"},
                                             {"label": "Dark", "value": "dark"},
+                                            {"label": "Light", "value": "light"},
                                         ],
-                                        value="light",
+                                        value="dark",
                                         inline=True,
                                         persistence=True,
                                         persistence_type="local",
-                                        style={"marginTop": "0.4rem"},
-                                        labelStyle={"color": _COLORS["ink"]},
                                     ),
                                 ],
-                                style={"minWidth": "150px"},
+                                className="lab-appearance",
                             ),
                         ],
-                        className="dashboard-header",
-                        style={
-                            "display": "flex",
-                            "alignItems": "center",
-                            "justifyContent": "space-between",
-                            "gap": "1rem",
-                        },
+                        className="dashboard-header lab-header",
+                    ),
+                    html.Section(
+                        replay_layout(library),
+                        id="lab-replay-view",
+                        hidden=False,
                     ),
                     html.Div(
                         [
+                            html.Div(
+                                [
+                                    html.H1("Black-Scholes-Merton calculator"),
+                                    html.P(
+                                        "European option valuation and analytic risk.",
+                                        className="lab-muted",
+                                    ),
+                                ],
+                                className="lab-calculator-title",
+                            ),
                             html.Section(
                                 [
                                     html.H2("Model inputs"),
@@ -631,30 +643,32 @@ def create_app() -> Dash:
                             ),
                             html.Section(
                                 id="results",
+                                children=html.P(
+                                    "Calculate a scenario to see its value and risk.",
+                                    className="lab-empty",
+                                ),
                                 **{"aria-live": "polite"},  # type: ignore[arg-type]
                             ),
                         ],
+                        id="lab-calculator-view",
+                        hidden=True,
                         className="dashboard-content-grid",
-                        style={
-                            "display": "grid",
-                            "gridTemplateColumns": (
-                                "minmax(240px, 300px) minmax(0, 1fr)"
-                            ),
-                            "gap": "1.5rem",
-                            "alignItems": "start",
-                        },
                     ),
                 ],
-                style={
-                    "maxWidth": "1280px",
-                    "margin": "0 auto",
-                    "padding": "1.5rem",
-                    "fontFamily": "Inter, system-ui, sans-serif",
-                    "color": _COLORS["ink"],
-                },
+                className="lab-body",
             ),
         ],
     )
+
+    register_replay_callbacks(app, library)
+
+    @app.callback(
+        Output("lab-replay-view", "hidden"),
+        Output("lab-calculator-view", "hidden"),
+        Input("lab-navigation", "value"),
+    )
+    def update_navigation(view: str) -> tuple[bool, bool]:
+        return view == "calculator", view != "calculator"
 
     @app.callback(
         Output("app-shell", "className"),

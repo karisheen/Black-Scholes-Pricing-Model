@@ -1,3 +1,5 @@
 include IMPLEMENTATION_SUMMARY.md ROADMAP.md
+include docs/images/options-lab-desktop.png
+include docs/images/options-lab-mobile.png
 recursive-include examples *.json *.py
 recursive-include tests/fixtures *.csv
