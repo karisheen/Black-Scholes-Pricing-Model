@@ -98,13 +98,16 @@ price residual does not imply many meaningful decimal places of volatility.
 
 ## Installation
 
-The supported Python versions are 3.10 and newer. `uv.lock` records the resolved
-environment used by CI and the reference benchmark.
+The supported Python versions are 3.10 and newer. Install
+[uv](https://docs.astral.sh/uv/getting-started/installation/) first; `uv.lock`
+records the resolved environment used by CI and the reference benchmark.
+The following installs the dashboard and Parquet replay extras, development
+tools, and benchmark tools into the project environment:
 
 ```bash
-git clone <repository-url>
-cd "Black Scholes Pricing Model"
-uv sync --extra dashboard --extra replay --group dev --group benchmark
+git clone https://github.com/karisheen/Black-Scholes-Pricing-Model.git
+cd Black-Scholes-Pricing-Model
+uv sync --locked --extra dashboard --extra replay --group dev --group benchmark
 ```
 
 For library-only use with `pip`:
@@ -594,7 +597,13 @@ src/quant_pricing/
 ├── binomial.py              # independent listed-option exercise reference
 ├── option_chain.py          # frozen-chain CLI and per-side IV report
 ├── cli.py                   # command-line adapter
-├── dashboard.py             # Dash adapter and vectorized sensitivity views
+├── dashboard.py             # Options Lab shell, calculator, and Dash entry point
+├── lab_data.py              # local report validation, selection, and risk adapters
+├── lab_workspace.py         # replay layout, atomic selection, and callbacks
+├── lab_chain.py             # chain, context, contract, smile, and fit views
+├── lab_diagnostics.py       # selected diagnostic evidence and panels
+├── lab_export.py            # deterministic in-memory CSV/JSON downloads
+├── lab_demo.py              # public synthetic books through production replay
 ├── exceptions.py            # domain-specific failures
 └── py.typed                 # PEP 561 typing marker
 
@@ -606,6 +615,14 @@ benchmarks/                  # correctness-checked performance experiments
 Pricing and numerical methods do not depend on Dash or external market data.
 The UI layer is optional and one-way: applications depend on the library, never
 the reverse.
+
+`src/quant_pricing/dashboard.py` loads reports through `lab_data.py` and mounts
+`lab_workspace.py` alongside the calculator. The workspace resolves one shared
+selection for `lab_chain.py`, `lab_diagnostics.py`, and `lab_export.py`; diagnostic
+panels and exports use the same evidence payload. With no report directory,
+`lab_data.py` uses `lab_demo.py`, which generates books and runs
+`deribit_chain.replay_chain` for IV recovery and calibration. The top-level
+`dashboard.py` is a compatibility entry point for the package application.
 
 ## Limitations
 

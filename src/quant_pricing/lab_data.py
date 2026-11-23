@@ -685,6 +685,11 @@ def contract_detail(view: ReplayView, symbol: str) -> Row:
                 charm=discount * (base.charm + rate * base.delta),
                 color=discount * (base.color + rate * base.gamma),
             )
+        else:
+            detail["risk_unavailable_reason"] = (
+                "Theta, rho, charm and color require a recorded flat, continuously "
+                "compounded rate. Other forward sensitivities remain available."
+            )
         if not isfinite(value) or any(
             risk is not None and not isfinite(risk) for risk in greeks.values()
         ):

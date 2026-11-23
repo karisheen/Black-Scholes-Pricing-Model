@@ -391,7 +391,11 @@ def test_report_io_errors_are_visible(
 def test_nonfinite_context_and_unreported_rate_convention(view: ReplayView) -> None:
     symbol = _selected(view)
     view.report["assumptions"]["rate_convention"] = "unspecified"
-    assert contract_detail(view, symbol)["greeks"]["rho"] is None
+    detail = contract_detail(view, symbol)
+    for name in ("theta", "rho", "charm", "color"):
+        assert detail["greeks"][name] is None
+    assert detail["greeks"]["delta"] is not None
+    assert "require a recorded flat" in detail["risk_unavailable_reason"]
     view.expiry["forward_input"] = float("nan")
     assert market_context(view, None)["forward"] is None
     assert choose_symbol(view, "all") is None
